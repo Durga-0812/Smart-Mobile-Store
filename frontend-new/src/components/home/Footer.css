@@ -1,0 +1,12 @@
+.home-footer {
+  margin-top: auto;
+  padding: 28px;
+  background: var(--nav-bg);
+  color: #9ca3af;
+  font-size: 14px;
+  text-align: center;
+}
+
+.home-footer p {
+  margin: 0;
+}

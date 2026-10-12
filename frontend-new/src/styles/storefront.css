@@ -1,0 +1,32 @@
+.home-page {
+  --page-bg: #f4f7f5;
+  --surface: #ffffff;
+  --surface-muted: #edf3f0;
+  --text-primary: #172522;
+  --text-muted: #64736e;
+  --border-subtle: #dfe8e3;
+  --accent: #147568;
+  --accent-hover: #0f5e54;
+  --nav-bg: #142522;
+  --nav-text: #f4f8f6;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--page-bg);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+.home-page[data-theme="dark"] {
+  --page-bg: #111a18;
+  --surface: #192421;
+  --surface-muted: #202d29;
+  --text-primary: #edf4f0;
+  --text-muted: #a3b2ac;
+  --border-subtle: #30403a;
+  --accent: #62b6a4;
+  --accent-hover: #81cdbd;
+  --nav-bg: #0c1311;
+  --nav-text: #f4f8f6;
+}

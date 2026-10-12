@@ -1,0 +1,30 @@
+# Python virtual environment
+backend/.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Node dependencies
+node_modules/
+frontend/node_modules/
+frontend-new/node_modules/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Build files
+dist/
+build/
+coverage/
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs and editor files
+*.log
+.vscode/
+.idea/
