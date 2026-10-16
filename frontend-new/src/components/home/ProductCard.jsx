@@ -4,10 +4,17 @@ import { useCart } from "../../hooks/useCart";
 export default function ProductCard({ product }) {
   const { addToCart } = useCart();
   const [added, setAdded] = useState(false);
+
+  // Support both frontend and backend field names.
+  const price = Number(product.price ?? product.priceNum);
+  const image = product.image ?? product.image_url ?? "";
+  const name = product.name ?? "Unnamed Product";
+
   const hasProductPhoto =
-    typeof product.image === "string" &&
-    (/^https?:\/\//i.test(product.image) ||
-      /\.(avif|gif|jpe?g|png|webp)(\?.*)?$/i.test(product.image));
+    typeof image === "string" &&
+    image.trim() !== "" &&
+    (/^https?:\/\//i.test(image) ||
+      /\.(avif|gif|jpe?g|png|webp)(\?.*)?$/i.test(image));
 
   const handleAdd = () => {
     addToCart(product);
@@ -19,19 +26,28 @@ export default function ProductCard({ product }) {
     <div className="product">
       <div className="product-image">
         {hasProductPhoto ? (
-          <img src={product.image} alt={product.name} loading="lazy" />
+          <img src={image} alt={name} loading="lazy" />
         ) : (
           <div className="product-render">
             <span className="product-render-camera" />
           </div>
         )}
       </div>
-      <h3>{product.name}</h3>
-      <p className="price">₹{product.priceNum.toLocaleString("en-IN")}</p>
+
+      <h3>{name}</h3>
+
+      <p className="price">
+        ₹
+        {Number.isFinite(price)
+          ? price.toLocaleString("en-IN")
+          : "Price unavailable"}
+      </p>
+
       <button
         className={`buy-btn ${added ? "added" : ""}`}
         type="button"
         onClick={handleAdd}
+        disabled={!Number.isFinite(price)}
       >
         {added ? "Added! ✓" : "Add to Cart"}
       </button>

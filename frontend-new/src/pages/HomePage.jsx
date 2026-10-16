@@ -5,7 +5,10 @@ import CategoriesSection from "../components/home/CategoriesSection";
 import ProductsSection from "../components/home/ProductsSection";
 import Footer from "../components/home/Footer";
 import CartModal from "../components/cart/CartModal";
+import { useCart } from "../hooks/useCart";
 import "../styles/storefront.css";
+
+const API_URL = "http://127.0.0.1:8000/api/v1/products/";
 
 export default function HomePage({
   isAuthenticated,
@@ -16,15 +19,80 @@ export default function HomePage({
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [theme, setTheme] = useState(() => localStorage.getItem("techlite_theme") || "light");
+  const [theme, setTheme] = useState(
+    () => localStorage.getItem("techlite_theme") || "light"
+  );
+
+  const { isCartOpen, setIsCartOpen, totalItems } = useCart();
+
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     localStorage.setItem("techlite_theme", theme);
   }, [theme]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function fetchProducts() {
+      try {
+        setLoading(true);
+        setError("");
+
+        const response = await fetch(API_URL, {
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(
+            `Unable to load products (HTTP ${response.status}).`
+          );
+        }
+
+        const data = await response.json();
+
+        const productList = Array.isArray(data)
+          ? data
+          : Array.isArray(data.products)
+            ? data.products
+            : Array.isArray(data.items)
+              ? data.items
+              : null;
+
+        if (!productList) {
+          throw new Error(
+            "The products API returned an unexpected response."
+          );
+        }
+
+        setProducts(productList);
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          console.error("Product loading error:", err);
+          setError(
+            err.message || "Could not connect to the product server."
+          );
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchProducts();
+
+    return () => controller.abort();
+  }, []);
+
   const handleCategorySelect = (category) => {
     setSelectedCategory(category);
-    document.getElementById("mobiles")?.scrollIntoView({ behavior: "smooth" });
+
+    document.getElementById("mobiles")?.scrollIntoView({
+      behavior: "smooth",
+    });
   };
 
   return (
@@ -36,10 +104,41 @@ export default function HomePage({
         onSignupClick={onSignupClick}
         onLogout={onLogout}
         theme={theme}
-        onThemeToggle={() => setTheme(theme === "light" ? "dark" : "light")}
+        onThemeToggle={() =>
+          setTheme((currentTheme) =>
+            currentTheme === "light" ? "dark" : "light"
+          )
+        }
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
       />
+
+      {/* Cart button */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          padding: "12px 24px",
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => setIsCartOpen(true)}
+          aria-label={`Open shopping cart with ${totalItems} items`}
+          style={{
+            padding: "10px 18px",
+            border: "none",
+            borderRadius: "8px",
+            backgroundColor: "#5f9295",
+            color: "#ffffff",
+            fontSize: "15px",
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+        >
+          🛒 Cart ({totalItems})
+        </button>
+      </div>
 
       <HeroSection fullName={fullName} />
 
@@ -48,15 +147,36 @@ export default function HomePage({
         onSelectCategory={handleCategorySelect}
       />
 
-      <ProductsSection
-        searchQuery={searchQuery}
-        selectedCategory={selectedCategory}
-      />
+      {loading ? (
+        <section className="products" id="mobiles">
+          <h2>The TechLite Collection</h2>
+          <p>Loading products...</p>
+        </section>
+      ) : error ? (
+        <section className="products" id="mobiles">
+          <h2>The TechLite Collection</h2>
+          <p role="alert">{error}</p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+          >
+            Try Again
+          </button>
+        </section>
+      ) : (
+        <ProductsSection
+          products={products}
+          searchQuery={searchQuery}
+          selectedCategory={selectedCategory}
+        />
+      )}
 
       <Footer />
 
-      {/* Cart Drawer */}
-      <CartModal />
+      <CartModal
+        isOpen={isCartOpen}
+        onClose={() => setIsCartOpen(false)}
+      />
     </div>
   );
 }

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import InputField from "../common/InputField";
 import { MailIcon, LockIcon } from "../common/Icons";
 
-export default function LoginForm({ onSuccess }) {
+export default function LoginForm({ onSuccess, role = "USER" }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
@@ -42,7 +42,7 @@ export default function LoginForm({ onSuccess }) {
         body: JSON.stringify({
           email: email.trim(),
           password,
-          role: "USER",
+          role,
         }),
       });
 

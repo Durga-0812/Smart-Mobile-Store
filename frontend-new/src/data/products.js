@@ -113,9 +113,17 @@ export const DEFAULT_PRODUCTS = [
   },
   {
     id: 17,
-    name: "Lenovo IdeaPad 5 Pro",
+    name: "Lenovo IdeaPad 5",
     priceNum: 55999,
     category: "Laptops",
     image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT1U_ftRLFTE76JeCt81wL4BnzymF2_mJImLjB7aiwLbw&s=10",
   },
+  {
+    id: 18,
+    name: "HP Pavilion 15",
+    priceNum: 68999,
+    category: "Laptops",
+    image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTP3BhLhEoenaf6Lp1fy1ijv4omgbkUfvjmolMpY3zERg&s=10",
+  },
+
 ];

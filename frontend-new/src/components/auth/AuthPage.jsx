@@ -12,6 +12,8 @@ import "./AuthPage.css";
 export default function AuthPage({
   mode,
   setMode,
+  loginRole,
+  setLoginRole,
   onClose,
   onLoginSuccess,
 }) {
@@ -20,7 +22,6 @@ export default function AuthPage({
   return (
     <main className="page">
       <section className="auth-card">
-        {/* LEFT IMAGE PANEL */}
         <div className="image-panel">
           <div className="image-overlay">
             <div className="logo-mark">
@@ -29,7 +30,6 @@ export default function AuthPage({
           </div>
         </div>
 
-        {/* RIGHT FORM PANEL */}
         <div className="form-panel">
           <button
             type="button"
@@ -41,7 +41,33 @@ export default function AuthPage({
           </button>
 
           <div className="heading-area">
-            <h1>{isSignup ? "Create an Account" : "Welcome Back"}</h1>
+            <h1>
+              {isSignup
+                ? "Create an Account"
+                : loginRole === "ADMIN"
+                  ? "Admin Login"
+                  : "Welcome Back"}
+            </h1>
+
+            {!isSignup && (
+              <div className="login-role-options">
+                <button
+                  type="button"
+                  className={loginRole === "USER" ? "active" : ""}
+                  onClick={() => setLoginRole("USER")}
+                >
+                  User Login
+                </button>
+
+                <button
+                  type="button"
+                  className={loginRole === "ADMIN" ? "active" : ""}
+                  onClick={() => setLoginRole("ADMIN")}
+                >
+                  Admin Login
+                </button>
+              </div>
+            )}
 
             <p>
               {isSignup ? (
@@ -57,14 +83,18 @@ export default function AuthPage({
                 </>
               ) : (
                 <>
-                  Don't have an account?{" "}
-                  <button
-                    type="button"
-                    className="switch-link"
-                    onClick={() => setMode("signup")}
-                  >
-                    Sign up
-                  </button>
+                  {loginRole === "ADMIN"
+                    ? "Sign in with your administrator account."
+                    : "Don't have an account? "}
+                  {loginRole === "USER" && (
+                    <button
+                      type="button"
+                      className="switch-link"
+                      onClick={() => setMode("signup")}
+                    >
+                      Sign up
+                    </button>
+                  )}
                 </>
               )}
             </p>
@@ -73,27 +103,33 @@ export default function AuthPage({
           {isSignup ? (
             <SignupForm onSuccess={() => setMode("login")} />
           ) : (
-            <LoginForm onSuccess={onLoginSuccess} />
+            <LoginForm
+              role={loginRole}
+              onSuccess={onLoginSuccess}
+            />
           )}
 
-          {/* SOCIAL LOGIN */}
-          <div className="divider">
-            <span></span>
-            <p>or</p>
-            <span></span>
-          </div>
+          {loginRole === "USER" && !isSignup && (
+            <>
+              <div className="divider">
+                <span />
+                <p>or</p>
+                <span />
+              </div>
 
-          <div className="social-row">
-            <button type="button" className="social-button">
-              <GoogleIcon />
-              <span>Continue with Google</span>
-            </button>
+              <div className="social-row">
+                <button type="button" className="social-button">
+                  <GoogleIcon />
+                  <span>Continue with Google</span>
+                </button>
 
-            <button type="button" className="social-button">
-              <FacebookIcon />
-              <span>Continue with Facebook</span>
-            </button>
-          </div>
+                <button type="button" className="social-button">
+                  <FacebookIcon />
+                  <span>Continue with Facebook</span>
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </section>
     </main>
