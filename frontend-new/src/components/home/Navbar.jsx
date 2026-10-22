@@ -9,6 +9,8 @@ export default function Navbar({
   onLoginClick,
   onSignupClick,
   onLogout,
+  onHomeClick,
+  onMyOrdersClick,
   searchQuery,
   setSearchQuery,
   onSearch,
@@ -42,18 +44,21 @@ export default function Navbar({
       </form>
 
       <div className="home-menu">
-        <a href="#home">Home</a>
-        <a href="#mobiles">Mobiles</a>
+        <a href="#home" onClick={onHomeClick}>Home</a>
 
         <button
           type="button"
           className="home-cart-btn"
           onClick={() => setIsCartOpen(true)}
-          aria-label={`Open Your bag${totalItems ? `, ${totalItems} items` : ""}`}
+          aria-label={
+            isAuthenticated
+              ? `Open Your bag${totalItems ? `, ${totalItems} items` : ""}`
+              : "Open your bag to log in or create an account"
+          }
         >
           <CartIcon size={18} />
           <span>Your bag</span>
-          {totalItems > 0 && (
+          {isAuthenticated && totalItems > 0 && (
             <span className="cart-nav-badge">{totalItems}</span>
           )}
         </button>
@@ -84,7 +89,24 @@ export default function Navbar({
               {isAccountMenuOpen && (
                 <div className="profile-menu" role="menu">
                   <span className="profile-menu-name">{fullName || "TechLite member"}</span>
-                  <button type="button" role="menuitem" onClick={onLogout}>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setIsAccountMenuOpen(false);
+                      onMyOrdersClick?.();
+                    }}
+                  >
+                    My orders
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setIsAccountMenuOpen(false);
+                      onLogout?.();
+                    }}
+                  >
                     Sign out
                   </button>
                 </div>

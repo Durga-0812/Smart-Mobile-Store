@@ -20,8 +20,18 @@ export default function AuthPage({
   const isSignup = mode === "signup";
 
   return (
-    <main className="page">
-      <section className="auth-card">
+    <main
+      className="page auth-modal-overlay"
+      onClick={onClose}
+      role="presentation"
+    >
+      <section
+        className="auth-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="auth-heading"
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="image-panel">
           <div className="image-overlay">
             <div className="logo-mark">
@@ -41,7 +51,7 @@ export default function AuthPage({
           </button>
 
           <div className="heading-area">
-            <h1>
+            <h1 id="auth-heading">
               {isSignup
                 ? "Create an Account"
                 : loginRole === "ADMIN"

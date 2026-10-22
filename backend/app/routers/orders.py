@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models import Order, OrderItem, Product, User
+from app.models import CartItem, Order, OrderItem, Product, User
 from app.schemas import OrderCreate, OrderResponse, OrderStatusUpdate
 from app.security import get_current_user, require_admin
 
@@ -132,6 +132,9 @@ def create_order(
                 )
             )
 
+        db.query(CartItem).filter(
+            CartItem.user_id == current_user.id
+        ).delete(synchronize_session=False)
         db.commit()
 
         created_order = (

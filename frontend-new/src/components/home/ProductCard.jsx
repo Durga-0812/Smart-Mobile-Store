@@ -1,14 +1,47 @@
 import React, { useState } from "react";
 import { useCart } from "../../hooks/useCart";
+import { getProductImageUrl } from "../../utils/productImages";
 
-export default function ProductCard({ product }) {
-  const { addToCart } = useCart();
+export default function ProductCard({
+  product,
+  isAuthenticated = false,
+  onLoginClick,
+}) {
+  const { addToCart, cartItems = [] } = useCart();
   const [added, setAdded] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState("");
 
   // Support both frontend and backend field names.
   const price = Number(product.price ?? product.priceNum);
-  const image = product.image ?? product.image_url ?? "";
+  const image = getProductImageUrl(product);
   const name = product.name ?? "Unnamed Product";
+  const cartQuantity = Number(
+    cartItems.find((item) => String(item.id) === String(product.id))
+      ?.quantity ?? 0
+  );
+  const stock = Number(product.stock_quantity);
+  const hasStockInfo =
+    product.stock_quantity !== undefined &&
+    product.stock_quantity !== null &&
+    Number.isFinite(stock);
+  const outOfStock = hasStockInfo && stock <= 0;
+  const stockMessage = outOfStock
+    ? "Out of stock"
+    : stock <= 5
+      ? "Very low stock"
+      : stock <= 20
+        ? "Only few stock left"
+        : "";
+  const buttonLabel = outOfStock
+    ? "Out of Stock"
+    : adding
+      ? "Adding..."
+      : added
+      ? "Added! ✓"
+      : isAuthenticated
+        ? "Add to Cart"
+        : "Login / Sign up to add";
 
   const hasProductPhoto =
     typeof image === "string" &&
@@ -16,10 +49,25 @@ export default function ProductCard({ product }) {
     (/^https?:\/\//i.test(image) ||
       /\.(avif|gif|jpe?g|png|webp)(\?.*)?$/i.test(image));
 
-  const handleAdd = () => {
-    addToCart(product);
-    setAdded(true);
-    setTimeout(() => setAdded(false), 1200);
+  const handleAdd = async () => {
+    if (outOfStock) return;
+
+    if (!isAuthenticated) {
+      onLoginClick?.();
+      return;
+    }
+
+    setAdding(true);
+    setAddError("");
+    try {
+      await addToCart(product);
+      setAdded(true);
+      setTimeout(() => setAdded(false), 1200);
+    } catch (error) {
+      setAddError(error.message || "Unable to add this product to your cart.");
+    } finally {
+      setAdding(false);
+    }
   };
 
   return (
@@ -43,13 +91,40 @@ export default function ProductCard({ product }) {
           : "Price unavailable"}
       </p>
 
+      {hasStockInfo && stockMessage && (
+        <p
+          className={`product-stock ${stock <= 5 ? "product-stock-low" : ""}`}
+          role="status"
+        >
+          {stockMessage}
+        </p>
+      )}
+
+      {addError && (
+        <p className="product-cart-error" role="alert">
+          {addError}
+        </p>
+      )}
+
       <button
-        className={`buy-btn ${added ? "added" : ""}`}
+        className={`buy-btn ${added ? "added" : ""} ${!isAuthenticated ? "login-required" : ""}`}
         type="button"
         onClick={handleAdd}
-        disabled={!Number.isFinite(price)}
+        disabled={
+          adding ||
+          outOfStock ||
+          (isAuthenticated && !Number.isFinite(price))
+        }
       >
-        {added ? "Added! ✓" : "Add to Cart"}
+        <span>{buttonLabel}</span>
+        {cartQuantity > 0 && isAuthenticated && !outOfStock && (
+          <span
+            className="buy-btn-cart-count"
+            aria-label={`${cartQuantity} in cart`}
+          >
+            {cartQuantity}
+          </span>
+        )}
       </button>
     </div>
   );

@@ -58,27 +58,44 @@ export default function AdminOrders() {
     loadOrders();
   }, []);
 
-  if (loading) return <p>Loading orders...</p>;
-
   return (
-    <section>
-      <h2>Order Management</h2>
+    <section className="admin-orders admin-orders-panel">
+      <header className="admin-orders-panel__header">
+        <div>
+          <p className="admin-orders-panel__eyebrow">Store activity</p>
+          <h2>Order Management</h2>
+          <p className="admin-orders-panel__subtitle">
+            Review purchases and keep customers up to date.
+          </p>
+        </div>
 
-      {error && <p style={{ color: "red" }}>{error}</p>}
+        <button
+          type="button"
+          className="admin-orders-panel__refresh"
+          onClick={loadOrders}
+          disabled={loading}
+        >
+          {loading ? "Refreshing..." : "Refresh orders"}
+        </button>
+      </header>
 
-      <button onClick={loadOrders}>Refresh Orders</button>
+      {error && (
+        <p className="admin-orders-panel__error" role="alert">
+          {error}
+        </p>
+      )}
 
-      {orders.length === 0 ? (
-        <p>No orders found.</p>
+      {loading ? (
+        <p className="admin-orders-panel__empty">Loading orders...</p>
+      ) : orders.length === 0 ? (
+        <div className="admin-orders-panel__empty">
+          <span aria-hidden="true">📦</span>
+          <strong>No orders yet</strong>
+          <p>New customer orders will appear here.</p>
+        </div>
       ) : (
-        <div style={{ overflowX: "auto" }}>
-          <table
-            style={{
-              width: "100%",
-              marginTop: "16px",
-              borderCollapse: "collapse",
-            }}
-          >
+        <div className="admin-orders-panel__table-wrap">
+          <table className="admin-orders-panel__table">
             <thead>
               <tr>
                 <th>Order ID</th>
@@ -97,16 +114,30 @@ export default function AdminOrders() {
                   <td>{order.user_id}</td>
                   <td>
                     {order.created_at
-                      ? new Date(order.created_at).toLocaleDateString()
+                      ? new Date(order.created_at).toLocaleDateString("en-IN", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })
                       : "—"}
                   </td>
                   <td>
-                    ₹{Number(order.total ?? order.total_amount ?? 0).toLocaleString("en-IN")}
+                    <strong className="admin-orders-panel__total">
+                      ₹{Number(order.total ?? order.total_amount ?? 0).toLocaleString("en-IN")}
+                    </strong>
                   </td>
-                  <td>{order.status}</td>
+                  <td>
+                    <span
+                      className={`admin-orders-panel__status admin-orders-panel__status--${String(order.status || "pending").toLowerCase()}`}
+                    >
+                      {order.status || "PENDING"}
+                    </span>
+                  </td>
                   <td>
                     <select
+                      className="admin-orders-panel__status-select"
                       value={order.status}
+                      aria-label={`Update order ${order.id} status`}
                       onChange={(event) =>
                         updateStatus(order.id, event.target.value)
                       }

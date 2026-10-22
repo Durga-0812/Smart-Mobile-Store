@@ -6,6 +6,7 @@ from app.routers import products
 from app import models
 from app.routers import products
 from app.routers import orders
+from app.routers import cart
 
 Base.metadata.create_all(bind=engine)
 
@@ -15,7 +16,10 @@ app = FastAPI(
 )
 
 app.add_middleware(CORSMiddleware,
-                   allow_origins=["http://localhost:5173"],
+                   allow_origins=[
+                       "http://localhost:5173",
+                       "http://127.0.0.1:5173",
+                   ],
                    allow_credentials=True,
                    allow_methods=["*"],
                    allow_headers=["*"])
@@ -23,6 +27,7 @@ app.add_middleware(CORSMiddleware,
 app.include_router(products.router)
 app.include_router(auth.router)
 app.include_router(orders.router)
+app.include_router(cart.router)
 
 @app.get("/", tags=["Root"])
 def root():

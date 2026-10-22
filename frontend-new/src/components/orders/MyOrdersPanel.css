@@ -1,0 +1,211 @@
+.my-orders-page {
+  flex: 1;
+  width: 100%;
+  padding: clamp(28px, 5vw, 64px) clamp(20px, 7vw, 96px);
+  background:
+    radial-gradient(circle at 92% 0%, rgba(20, 117, 104, 0.09), transparent 25rem),
+    var(--page-bg);
+}
+
+.my-orders-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  max-width: 1120px;
+  margin: 0 auto 30px;
+}
+
+.my-orders-eyebrow,
+.order-label {
+  margin: 0 0 7px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.my-orders-heading h1 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: clamp(30px, 4vw, 42px);
+}
+
+.my-orders-heading > div:first-child > p:last-child {
+  margin: 9px 0 0;
+  color: var(--text-muted);
+}
+
+.my-orders-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.my-orders-actions button,
+.orders-empty button,
+.orders-error button {
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.my-orders-actions .orders-refresh-button,
+.orders-empty button,
+.orders-error button {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.my-orders-actions button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.orders-list {
+  display: grid;
+  gap: 16px;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.order-card {
+  padding: 22px 24px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 12px 34px rgba(18, 44, 36, 0.05);
+}
+
+.order-card-header,
+.order-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.order-card-header h2 {
+  max-width: min(70vw, 560px);
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 15px;
+  text-overflow: ellipsis;
+}
+
+.order-card-header .order-label {
+  margin-bottom: 5px;
+}
+
+.order-status {
+  padding: 6px 11px;
+  border-radius: 99px;
+  background: #eaf4ef;
+  color: #25724d;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.order-status-cancelled {
+  background: #fff0ed;
+  color: #b54332;
+}
+
+.order-status-pending,
+.order-status-processing {
+  background: #fff5df;
+  color: #946515;
+}
+
+.order-date {
+  margin: 9px 0 15px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.order-items {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 15px 0;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  list-style: none;
+}
+
+.order-items li,
+.order-card-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.order-items small,
+.order-card-footer > span {
+  color: var(--text-muted);
+}
+
+.order-items strong,
+.order-card-footer strong {
+  white-space: nowrap;
+}
+
+.order-card-footer {
+  padding-top: 14px;
+}
+
+.orders-state {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 50px 20px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.orders-empty > span {
+  font-size: 40px;
+}
+
+.orders-empty h2 {
+  margin: 10px 0;
+  color: var(--text-primary);
+}
+
+.orders-empty p {
+  margin: 0 0 20px;
+}
+
+.orders-error p {
+  margin: 0 0 16px;
+  color: #b42318;
+}
+
+@media (max-width: 650px) {
+  .my-orders-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .order-card {
+    padding: 18px 16px;
+  }
+
+  .order-items li,
+  .order-card-footer {
+    font-size: 13px;
+  }
+}

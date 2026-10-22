@@ -1,6 +1,12 @@
 import React, { useEffect, useState } from "react";
 import "./AdminDashboard.css";
 import AdminOrders from "../components/admin/AdminOrders";
+import {
+  getCanonicalCategory,
+  getCategoryId,
+  getCategoryName,
+  PRODUCT_CATEGORIES,
+} from "../data/categories";
 
 const API = "http://127.0.0.1:8000/api/v1";
 
@@ -15,6 +21,9 @@ const emptyProduct = {
 
 export default function AdminDashboard({ fullName, onLogout }) {
   const [section, setSection] = useState("Dashboard");
+  const [theme, setTheme] = useState(
+    () => localStorage.getItem("techlite_theme") || "light"
+  );
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -27,6 +36,10 @@ export default function AdminDashboard({ fullName, onLogout }) {
   const [saving, setSaving] = useState(false);
 
   const token = () => localStorage.getItem("access_token");
+
+  useEffect(() => {
+    localStorage.setItem("techlite_theme", theme);
+  }, [theme]);
 
   async function loadData() {
     setLoading(true);
@@ -78,7 +91,7 @@ export default function AdminDashboard({ fullName, onLogout }) {
       name: product.name ?? "",
       description: product.description ?? "",
       price: String(product.price ?? ""),
-      category: product.category ?? "",
+      category: getCanonicalCategory(product.category),
       stock_quantity: String(product.stock_quantity ?? ""),
       image_url: product.image_url ?? "",
     });
@@ -123,7 +136,7 @@ export default function AdminDashboard({ fullName, onLogout }) {
       name: form.name.trim(),
       description: form.description.trim(),
       price,
-      category: form.category.trim(),
+      category: form.category,
       stock_quantity: stock,
       image_url: form.image_url.trim() || null,
     };
@@ -221,9 +234,15 @@ export default function AdminDashboard({ fullName, onLogout }) {
     ["Messages", "✉"],
     ["Settings", "⚙"],
   ];
+  const categorySummaries = PRODUCT_CATEGORIES.map((category) => ({
+    ...category,
+    productCount: products.filter(
+      (product) => getCategoryId(product.category) === category.id
+    ).length,
+  }));
 
   return (
-    <div className="admin-layout">
+    <div className="admin-layout" data-theme={theme}>
       <aside className="admin-sidebar">
         <div className="admin-brand">
           Tech<span>Lite</span>
@@ -309,22 +328,24 @@ export default function AdminDashboard({ fullName, onLogout }) {
             </div>
 
             <section className="admin-panel">
-              <div className="admin-panel-heading">
-                <h2>
-                  {section === "Dashboard"
-                    ? "Product Overview"
-                    : section}
-                </h2>
+              {section !== "Orders" && (
+                <div className="admin-panel-heading">
+                  <h2>
+                    {section === "Dashboard"
+                      ? "Product Overview"
+                      : section}
+                  </h2>
 
-                {section === "Products" && (
-                  <button
-                    className="admin-add-button"
-                    onClick={openAddForm}
-                  >
-                    + Add Product
-                  </button>
-                )}
-              </div>
+                  {section === "Products" && (
+                    <button
+                      className="admin-add-button"
+                      onClick={openAddForm}
+                    >
+                      + Add Product
+                    </button>
+                  )}
+                </div>
+              )}
 
               {showForm && section === "Products" && (
                 <form className="product-admin-form" onSubmit={saveProduct}>
@@ -346,12 +367,21 @@ export default function AdminDashboard({ fullName, onLogout }) {
 
                     <label>
                       Category
-                      <input
+                      <select
                         name="category"
                         value={form.category}
                         onChange={updateField}
-                        placeholder="e.g. Smartphones"
-                      />
+                        required
+                      >
+                        <option value="" disabled>
+                          Choose a category
+                        </option>
+                        {PRODUCT_CATEGORIES.map((category) => (
+                          <option key={category.id} value={category.name}>
+                            {category.name}
+                          </option>
+                        ))}
+                      </select>
                     </label>
 
                     <label>
@@ -445,7 +475,7 @@ export default function AdminDashboard({ fullName, onLogout }) {
                         {products.map((product) => (
                           <tr key={product.id}>
                             <td>{product.name}</td>
-                            <td>{product.category || "—"}</td>
+                            <td>{getCategoryName(product.category)}</td>
                             <td>
                               ₹
                               {Number(product.price || 0).toLocaleString(
@@ -506,13 +536,57 @@ export default function AdminDashboard({ fullName, onLogout }) {
                   </div>
                 )
               ) : section === "Orders" ? (
-  <AdminOrders />
-) : section !== "Dashboard" && section !== "Products" ? (
-  <p>
-    The {section.toLowerCase()} section requires its corresponding
-    backend functionality before it can manage real data.
-  </p>
-) : null}
+                <AdminOrders />
+              ) : section === "Categories" ? (
+                <div className="admin-category-grid">
+                  {categorySummaries.map((category) => (
+                    <article className="admin-category-card" key={category.id}>
+                      <span className="admin-category-icon" aria-hidden="true">
+                        {category.icon}
+                      </span>
+                      <div>
+                        <h3>{category.name}</h3>
+                        <p>
+                          <strong>{category.productCount}</strong>{" "}
+                          {category.productCount === 1 ? "product" : "products"}
+                        </p>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : section === "Settings" ? (
+                <div className="admin-settings">
+                  <div>
+                    <h3>Appearance</h3>
+                    <p>Choose the theme used across the TechLite dashboard and store.</p>
+                  </div>
+                  <div className="admin-setting-row">
+                    <div>
+                      <strong>Dark mode</strong>
+                      <span>Reduce brightness with a darker interface.</span>
+                    </div>
+                    <button
+                      type="button"
+                      className={`admin-theme-switch ${theme === "dark" ? "enabled" : ""}`}
+                      role="switch"
+                      aria-checked={theme === "dark"}
+                      aria-label="Dark mode"
+                      onClick={() =>
+                        setTheme((current) =>
+                          current === "light" ? "dark" : "light"
+                        )
+                      }
+                    >
+                      <span />
+                    </button>
+                  </div>
+                </div>
+              ) : section !== "Dashboard" && section !== "Products" ? (
+                <p>
+                  The {section.toLowerCase()} section requires its corresponding
+                  backend functionality before it can manage real data.
+                </p>
+              ) : null}
             </section>
           </>
         )}

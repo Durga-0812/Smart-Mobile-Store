@@ -5,6 +5,7 @@ import CategoriesSection from "../components/home/CategoriesSection";
 import ProductsSection from "../components/home/ProductsSection";
 import Footer from "../components/home/Footer";
 import CartModal from "../components/cart/CartModal";
+import MyOrdersPanel from "../components/orders/MyOrdersPanel";
 import { useCart } from "../hooks/useCart";
 import "../styles/storefront.css";
 
@@ -19,11 +20,18 @@ export default function HomePage({
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [sortBy, setSortBy] = useState("relevance");
+  const [showOrders, setShowOrders] = useState(false);
   const [theme, setTheme] = useState(
     () => localStorage.getItem("techlite_theme") || "light"
   );
 
-  const { isCartOpen, setIsCartOpen, totalItems } = useCart();
+  const {
+    isCartOpen,
+    setIsCartOpen,
+    cartError,
+    dismissCartError,
+  } = useCart();
 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -103,6 +111,8 @@ export default function HomePage({
         onLoginClick={onLoginClick}
         onSignupClick={onSignupClick}
         onLogout={onLogout}
+        onHomeClick={() => setShowOrders(false)}
+        onMyOrdersClick={() => setShowOrders(true)}
         theme={theme}
         onThemeToggle={() =>
           setTheme((currentTheme) =>
@@ -113,62 +123,58 @@ export default function HomePage({
         setSearchQuery={setSearchQuery}
       />
 
-      {/* Cart button */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "flex-end",
-          padding: "12px 24px",
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => setIsCartOpen(true)}
-          aria-label={`Open shopping cart with ${totalItems} items`}
-          style={{
-            padding: "10px 18px",
-            border: "none",
-            borderRadius: "8px",
-            backgroundColor: "#5f9295",
-            color: "#ffffff",
-            fontSize: "15px",
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
-        >
-          🛒 Cart ({totalItems})
-        </button>
-      </div>
-
-      <HeroSection fullName={fullName} />
-
-      <CategoriesSection
-        selectedCategory={selectedCategory}
-        onSelectCategory={handleCategorySelect}
-      />
-
-      {loading ? (
-        <section className="products" id="mobiles">
-          <h2>The TechLite Collection</h2>
-          <p>Loading products...</p>
-        </section>
-      ) : error ? (
-        <section className="products" id="mobiles">
-          <h2>The TechLite Collection</h2>
-          <p role="alert">{error}</p>
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-          >
-            Try Again
+      {cartError && (
+        <div className="cart-sync-error" role="alert">
+          <span>{cartError}</span>
+          <button type="button" onClick={dismissCartError} aria-label="Dismiss cart error">
+            ×
           </button>
-        </section>
+        </div>
+      )}
+
+      {showOrders ? (
+        <MyOrdersPanel onBack={() => setShowOrders(false)} />
       ) : (
-        <ProductsSection
-          products={products}
-          searchQuery={searchQuery}
-          selectedCategory={selectedCategory}
-        />
+        <>
+          <CategoriesSection
+            selectedCategory={selectedCategory}
+            onSelectCategory={handleCategorySelect}
+          />
+
+          <HeroSection
+            fullName={fullName}
+            onCategorySelect={handleCategorySelect}
+          />
+
+          {loading ? (
+            <section className="products" id="mobiles">
+              <h2>The TechLite Collection</h2>
+              <p>Loading products...</p>
+            </section>
+          ) : error ? (
+            <section className="products" id="mobiles">
+              <h2>The TechLite Collection</h2>
+              <p role="alert">{error}</p>
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+              >
+                Try Again
+              </button>
+            </section>
+          ) : (
+            <ProductsSection
+              products={products}
+              searchQuery={searchQuery}
+              selectedCategory={selectedCategory}
+              isAuthenticated={isAuthenticated}
+              fullName={fullName}
+              onLoginClick={onLoginClick}
+              sortBy={sortBy}
+              onSortChange={setSortBy}
+            />
+          )}
+        </>
       )}
 
       <Footer />
@@ -176,6 +182,9 @@ export default function HomePage({
       <CartModal
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
+        isAuthenticated={isAuthenticated}
+        onLoginClick={onLoginClick}
+        onSignupClick={onSignupClick}
       />
     </div>
   );

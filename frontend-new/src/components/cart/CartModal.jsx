@@ -8,12 +8,19 @@ const SHIPPING_CHARGE = 99;
 const TAX_RATE = 0.1;
 const API_URL = "http://127.0.0.1:8000/api/v1";
 
-export default function CartModal({ isOpen, onClose }) {
+export default function CartModal({
+  isOpen,
+  onClose,
+  isAuthenticated = false,
+  onLoginClick,
+  onSignupClick,
+}) {
   const {
     cartItems = [],
     updateQuantity,
     removeFromCart,
     clearCart,
+    clearLocalCart,
   } = useCart();
 
   const [coupon, setCoupon] = useState("");
@@ -23,6 +30,8 @@ export default function CartModal({ isOpen, onClose }) {
   const [messageType, setMessageType] = useState("info");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(null);
+  const [orderIdCopied, setOrderIdCopied] = useState(false);
+  const [copyError, setCopyError] = useState("");
 
   const subtotal = useMemo(
     () =>
@@ -62,17 +71,47 @@ export default function CartModal({ isOpen, onClose }) {
     setMessageType(type);
   };
 
-  const handleQuantity = (item, change) => {
+  const handleCopyOrderId = async () => {
+    try {
+      await navigator.clipboard.writeText(orderSuccess.id);
+      setOrderIdCopied(true);
+      setCopyError("");
+      window.setTimeout(() => setOrderIdCopied(false), 1800);
+    } catch {
+      setCopyError("Could not copy the order ID. Please select and copy it.");
+    }
+  };
+
+  const handleQuantity = async (item, change) => {
+    if (!isAuthenticated) {
+      onLoginClick?.();
+      return;
+    }
+
     const currentQuantity = Number(item.quantity ?? 1);
 
     if (currentQuantity + change < 1) return;
 
-    updateQuantity(item.id, change);
-    showMessage("");
+    try {
+      await updateQuantity(item.id, change);
+      showMessage("");
+    } catch (error) {
+      showMessage(error.message || "Unable to update item quantity.", "error");
+    }
   };
 
-  const handleRemove = (item) => {
-    removeFromCart(item.id);
+  const handleRemove = async (item) => {
+    if (!isAuthenticated) {
+      onLoginClick?.();
+      return;
+    }
+
+    try {
+      await removeFromCart(item.id);
+    } catch (error) {
+      showMessage(error.message || "Unable to remove this product.", "error");
+      return;
+    }
 
     setCoupon("");
     setAppliedCoupon("");
@@ -137,8 +176,18 @@ export default function CartModal({ isOpen, onClose }) {
     showMessage("Invalid coupon code.", "error");
   };
 
-  const handleClearCart = () => {
-    clearCart();
+  const handleClearCart = async () => {
+    if (!isAuthenticated) {
+      onLoginClick?.();
+      return;
+    }
+
+    try {
+      await clearCart();
+    } catch (error) {
+      showMessage(error.message || "Unable to clear your cart.", "error");
+      return;
+    }
     setCoupon("");
     setAppliedCoupon("");
     setDiscount(0);
@@ -193,7 +242,7 @@ export default function CartModal({ isOpen, onClose }) {
       }
 
       setOrderSuccess(data);
-      clearCart();
+      clearLocalCart();
 
       setCoupon("");
       setAppliedCoupon("");
@@ -223,7 +272,7 @@ export default function CartModal({ isOpen, onClose }) {
       >
         <header className="cart-header">
           <div className="cart-header-title">
-            <h2>Your Cart</h2>
+            <h2>{orderSuccess ? "Order Receipt" : "Your Cart"}</h2>
             <span className="cart-badge-count">
               {orderSuccess ? 0 : itemCount}
             </span>
@@ -241,38 +290,138 @@ export default function CartModal({ isOpen, onClose }) {
 
         <div className="cart-content">
           {orderSuccess ? (
-            <div className="cart-empty">
-              <div className="cart-empty-icon">✅</div>
-              <h3>Order placed successfully!</h3>
-              <p>
-                Thank you for shopping with TechLite.
-              </p>
-              <p>
-                Order ID: {orderSuccess.id ?? "Confirmed"}
-              </p>
-              {orderSuccess.status && (
-                <p>Status: {orderSuccess.status}</p>
-              )}
-              <p>
-                Total:{" "}
-                {formatPrice(
-                  orderSuccess.total ??
-                    orderSuccess.total_amount ??
-                    total
-                )}
-              </p>
+            <div className="cart-empty cart-receipt-view">
+              <section className="cart-receipt" aria-label="Order receipt">
+                <div className="cart-receipt-brand">TechLite</div>
+                <h3>Order placed successfully!</h3>
+                <p className="cart-receipt-thanks">
+                  Thank you for shopping with TechLite.
+                </p>
 
-              <button
-                type="button"
-                className="cart-browse-btn"
-                onClick={() => {
-                  setOrderSuccess(null);
-                  setMessage("");
-                  onClose();
-                }}
-              >
-                Continue Shopping
-              </button>
+                <dl className="cart-receipt-meta">
+                  <div>
+                    <dt>Order ID</dt>
+                    <dd className="cart-receipt-order-id">
+                      <code>{orderSuccess.id}</code>
+                      <button
+                        type="button"
+                        className="cart-copy-order-id"
+                        onClick={handleCopyOrderId}
+                        aria-label="Copy order ID"
+                      >
+                        {orderIdCopied ? "Copied" : "Copy"}
+                      </button>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Order date</dt>
+                    <dd>
+                      {new Date(orderSuccess.created_at).toLocaleString("en-IN")}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Status</dt>
+                    <dd>{orderSuccess.status}</dd>
+                  </div>
+                </dl>
+                {copyError && (
+                  <p className="cart-receipt-copy-error" role="alert">
+                    {copyError}
+                  </p>
+                )}
+                <p className="cart-receipt-status-note">
+                  Your order is placed and awaiting processing.
+                </p>
+
+                <div className="cart-receipt-items">
+                  <div className="cart-receipt-row cart-receipt-items-heading">
+                    <span>Item</span>
+                    <span>Qty</span>
+                    <span>Amount</span>
+                  </div>
+                  {(orderSuccess.items ?? []).map((item) => (
+                    <div className="cart-receipt-row" key={item.id}>
+                      <span>
+                        {item.product_name}
+                        <small>{formatPrice(item.unit_price)} each</small>
+                      </span>
+                      <span>{item.quantity}</span>
+                      <span>{formatPrice(item.line_total)}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="cart-receipt-summary">
+                  <div>
+                    <span>Subtotal</span>
+                    <span>{formatPrice(orderSuccess.subtotal)}</span>
+                  </div>
+                  {Number(orderSuccess.discount) > 0 && (
+                    <div>
+                      <span>Discount</span>
+                      <span>-{formatPrice(orderSuccess.discount)}</span>
+                    </div>
+                  )}
+                  <div>
+                    <span>Tax</span>
+                    <span>{formatPrice(orderSuccess.tax)}</span>
+                  </div>
+                  <div>
+                    <span>Shipping</span>
+                    <span>{formatPrice(orderSuccess.shipping)}</span>
+                  </div>
+                  <div className="cart-receipt-total">
+                    <strong>Order total</strong>
+                    <strong>{formatPrice(orderSuccess.total)}</strong>
+                  </div>
+                </div>
+              </section>
+
+              <div className="cart-receipt-actions">
+                <button
+                  type="button"
+                  className="cart-print-btn"
+                  onClick={() => window.print()}
+                >
+                  Print Bill
+                </button>
+                <button
+                  type="button"
+                  className="cart-browse-btn"
+                  onClick={() => {
+                    setOrderSuccess(null);
+                    setMessage("");
+                    onClose();
+                  }}
+                >
+                  Continue Shopping
+                </button>
+              </div>
+            </div>
+          ) : !isAuthenticated ? (
+            <div className="cart-empty cart-auth-required">
+              <div className="cart-empty-icon">🔐</div>
+              <h3>Sign in to manage your cart</h3>
+              <p>
+                Log in or create an account to add, update, or remove products
+                from your cart.
+              </p>
+              <div className="cart-auth-actions">
+                <button
+                  type="button"
+                  className="cart-browse-btn"
+                  onClick={onLoginClick}
+                >
+                  Login
+                </button>
+                <button
+                  type="button"
+                  className="cart-auth-signup-btn"
+                  onClick={onSignupClick}
+                >
+                  Create account
+                </button>
+              </div>
             </div>
           ) : cartItems.length === 0 ? (
             <div className="cart-empty">
@@ -371,7 +520,7 @@ export default function CartModal({ isOpen, onClose }) {
           )}
         </div>
 
-        {!orderSuccess && cartItems.length > 0 && (
+        {!orderSuccess && isAuthenticated && cartItems.length > 0 && (
           <footer className="cart-footer">
             <div className="cart-coupon">
               <label htmlFor="cart-coupon-input">

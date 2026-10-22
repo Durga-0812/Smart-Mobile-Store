@@ -72,30 +72,36 @@ export default function App() {
   };
 
   return (
-    <CartProvider>
-      {showAuth ? (
-        <AuthPage
-          mode={mode}
-          setMode={setMode}
-          loginRole={loginRole}
-          setLoginRole={setLoginRole}
-          onClose={() => setShowAuth(false)}
-          onLoginSuccess={handleLoginSuccess}
-        />
-      ) : authenticated && role === "ADMIN" ? (
+    <CartProvider
+      key={authenticated && role === "USER" ? "user-cart" : "guest-cart"}
+      isAuthenticated={authenticated && role === "USER"}
+    >
+      {authenticated && role === "ADMIN" ? (
         <AdminDashboard
           fullName={fullName}
           onLogout={handleLogout}
         />
       ) : (
-        <HomePage
-          isAuthenticated={authenticated}
-          fullName={fullName}
-          onLoginClick={handleLoginClick}
-          onSignupClick={handleSignupClick}
-          onAdminLoginClick={handleAdminLoginClick}
-          onLogout={handleLogout}
-        />
+        <>
+          <HomePage
+            isAuthenticated={authenticated}
+            fullName={fullName}
+            onLoginClick={handleLoginClick}
+            onSignupClick={handleSignupClick}
+            onAdminLoginClick={handleAdminLoginClick}
+            onLogout={handleLogout}
+          />
+          {showAuth && (
+            <AuthPage
+              mode={mode}
+              setMode={setMode}
+              loginRole={loginRole}
+              setLoginRole={setLoginRole}
+              onClose={() => setShowAuth(false)}
+              onLoginSuccess={handleLoginSuccess}
+            />
+          )}
+        </>
       )}
     </CartProvider>
   );

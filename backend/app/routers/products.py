@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Product
+from app.models import CartItem, Product
 from app.schemas import ProductCreate, ProductUpdate, ProductResponse
 from app.security import require_admin
 
@@ -97,6 +97,9 @@ def delete_product(
     if product is None:
         raise HTTPException(status_code=404, detail="Product not found")
 
+    db.query(CartItem).filter(CartItem.product_id == product_id).delete(
+        synchronize_session=False
+    )
     db.delete(product)
     db.commit()
 

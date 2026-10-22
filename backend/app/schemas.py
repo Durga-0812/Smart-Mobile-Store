@@ -75,6 +75,30 @@ class OrderCreate(BaseModel):
     coupon_code: str | None = None
 
 
+class CartItemAdd(BaseModel):
+    product_id: str
+    quantity: int = Field(default=1, gt=0, le=100)
+
+
+class CartItemUpdate(BaseModel):
+    quantity: int = Field(gt=0, le=100)
+
+
+class CartProductResponse(BaseModel):
+    id: str
+    name: str
+    price: Decimal
+    stock_quantity: int
+    category: str
+    image_url: Optional[str] = None
+    quantity: int
+
+
+class CartResponse(BaseModel):
+    items: List[CartProductResponse]
+    total_items: int
+
+
 class OrderItemResponse(BaseModel):
     id: str
     product_id: str

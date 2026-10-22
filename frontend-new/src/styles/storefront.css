@@ -1,32 +1,80 @@
 .home-page {
-  --page-bg: #f4f7f5;
+  --font-body: "Manrope", "Segoe UI", sans-serif;
+  --font-display: "Cormorant Garamond", Georgia, serif;
+  --page-bg: #f4f5f9;
   --surface: #ffffff;
-  --surface-muted: #edf3f0;
-  --text-primary: #172522;
-  --text-muted: #64736e;
-  --border-subtle: #dfe8e3;
-  --accent: #147568;
-  --accent-hover: #0f5e54;
-  --nav-bg: #142522;
-  --nav-text: #f4f8f6;
+  --surface-muted: #f2e4ff;
+  --text-primary: #24212b;
+  --text-muted: #77717f;
+  --border-subtle: #eeeaf2;
+  --accent: #7000c8;
+  --accent-hover: #57009e;
+  --nav-bg: #7000c8;
+  --nav-text: #ffffff;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   background: var(--page-bg);
   color: var(--text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  font-family: var(--font-body);
   transition: background-color 180ms ease, color 180ms ease;
 }
 
+.home-page button,
+.home-page input,
+.home-page select {
+  font-family: inherit;
+}
+
+.home-page h1,
+.home-page .products-personalized h2 {
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+
 .home-page[data-theme="dark"] {
-  --page-bg: #111a18;
-  --surface: #192421;
-  --surface-muted: #202d29;
-  --text-primary: #edf4f0;
-  --text-muted: #a3b2ac;
-  --border-subtle: #30403a;
-  --accent: #62b6a4;
-  --accent-hover: #81cdbd;
-  --nav-bg: #0c1311;
-  --nav-text: #f4f8f6;
+  --page-bg: #17131d;
+  --surface: #211b29;
+  --surface-muted: #30233b;
+  --text-primary: #f5effa;
+  --text-muted: #b6aabd;
+  --border-subtle: #3a3043;
+  --accent: #bd83ef;
+  --accent-hover: #d1a7f5;
+  --nav-bg: #21142d;
+  --nav-text: #f8f3fb;
+}
+
+.cart-sync-error {
+  position: fixed;
+  z-index: 900;
+  right: 20px;
+  bottom: 20px;
+  max-width: min(420px, calc(100vw - 40px));
+  padding: 13px 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  background: #fff;
+  color: #b42318;
+  box-shadow: 0 8px 24px rgba(32, 16, 57, 0.16);
+  font-size: 14px;
+}
+
+.cart-sync-error button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.home-page[data-theme="dark"] .cart-sync-error {
+  border-color: #7f1d1d;
+  background: #321d24;
+  color: #fecaca;
 }
