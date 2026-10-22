@@ -36,8 +36,7 @@
 .home-page .products .products-personalized h2 {
   color: var(--text-primary);
   font-size: clamp(24px, 2.6vw, 34px);
-  line-height: 1.12;
-  letter-spacing: -0.35px;
+  line-height: 1.18;
   text-align: left;
 }
 
@@ -72,7 +71,7 @@
   color: var(--text-primary);
   font-size: 22px;
   font-weight: 700;
-  letter-spacing: -0.35px;
+  letter-spacing: -0.025em;
 }
 
 .product-sort {
@@ -216,6 +215,7 @@
   color: var(--text-primary);
   font-size: 17px;
   font-weight: 600;
+  letter-spacing: -0.015em;
 }
 
 .price {

@@ -1,6 +1,6 @@
 .home-page {
-  --font-body: "Manrope", "Segoe UI", sans-serif;
-  --font-display: "Cormorant Garamond", Georgia, serif;
+  --font-body: "DM Sans", "Segoe UI", sans-serif;
+  --font-display: "DM Sans", "Segoe UI", sans-serif;
   --page-bg: #f4f5f9;
   --surface: #ffffff;
   --surface-muted: #f2e4ff;
@@ -29,7 +29,8 @@
 .home-page h1,
 .home-page .products-personalized h2 {
   font-family: var(--font-display);
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: -0.04em;
 }
 
 .home-page[data-theme="dark"] {
