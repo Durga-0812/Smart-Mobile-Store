@@ -46,7 +46,7 @@ export default function SignupForm({ onSuccess }) {
     try {
       setLoading(true);
 
-      const response = await fetch("http://127.0.0.1:8000/api/v1/auth/signup", {
+      const response = await fetch("https://techlite-5x6a.onrender.com/api/v1/auth/signup", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

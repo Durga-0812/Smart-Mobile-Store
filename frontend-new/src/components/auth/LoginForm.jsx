@@ -34,7 +34,7 @@ export default function LoginForm({ onSuccess, role = "USER" }) {
     try {
       setLoading(true);
 
-      const response = await fetch("http://127.0.0.1:8000/api/v1/auth/login", {
+      const response = await fetch("https://techlite-5x6a.onrender.com/api/v1/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
