@@ -33,15 +33,32 @@ export default function Navbar({
         </a>
       </div>
 
-      <form className="home-search" onSubmit={handleSearchSubmit}>
-        <input
-          type="text"
-          placeholder="Search products..."
-          value={searchQuery || ""}
-          onChange={(e) => setSearchQuery && setSearchQuery(e.target.value)}
-        />
-        <button type="submit">Search</button>
-      </form>
+      ```jsx
+<form
+  className="home-search"
+  onSubmit={(e) => {
+    handleSearchSubmit(e);
+    document.getElementById("mobiles")?.scrollIntoView({
+      behavior: "smooth",
+    });
+  }}
+>
+  <input
+    type="text"
+    placeholder="Search mobiles, laptops, accessories..."
+    value={searchQuery || ""}
+    onChange={(e) => setSearchQuery && setSearchQuery(e.target.value)}
+    onFocus={() => {
+      document.getElementById("mobiles")?.scrollIntoView({
+        behavior: "smooth",
+      });
+    }}
+    aria-label="Search products"
+  />
+  <button type="submit">Search</button>
+</form>
+
+
 
       <div className="home-menu">
         <a href="#home" onClick={onHomeClick}>Home</a>

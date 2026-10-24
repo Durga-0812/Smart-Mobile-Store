@@ -6,6 +6,7 @@ export default function ProductCard({
   product,
   isAuthenticated = false,
   onLoginClick,
+  onProductClick,
 }) {
   const { addToCart, cartItems = [] } = useCart();
   const [added, setAdded] = useState(false);
@@ -71,7 +72,21 @@ export default function ProductCard({
   };
 
   return (
-    <div className="product">
+    <div
+  className="product"
+  onClick={() => onProductClick?.(product)}
+  role={onProductClick ? "button" : undefined}
+  tabIndex={onProductClick ? 0 : undefined}
+  onKeyDown={(event) => {
+    if (
+      event.target === event.currentTarget &&
+      (event.key === "Enter" || event.key === " ")
+    ) {
+      event.preventDefault();
+      onProductClick?.(product);
+    }
+  }}
+>
       <div className="product-image">
         {hasProductPhoto ? (
           <img src={image} alt={name} loading="lazy" />
@@ -109,7 +124,10 @@ export default function ProductCard({
       <button
         className={`buy-btn ${added ? "added" : ""} ${!isAuthenticated ? "login-required" : ""}`}
         type="button"
-        onClick={handleAdd}
+        onClick={(event) => {
+  event.stopPropagation();
+  handleAdd();
+}}
         disabled={
           adding ||
           outOfStock ||

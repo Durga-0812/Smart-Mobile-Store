@@ -24,7 +24,9 @@ export default function ProductsSection({
   onLoginClick,
   sortBy = "relevance",
   onSortChange,
+  onProductClick,
 }) {
+
   const normalizedSearch = searchQuery.trim().toLowerCase();
   const categoryPrompt =
     CATEGORY_PROMPTS[selectedCategory] || "your next tech upgrade";

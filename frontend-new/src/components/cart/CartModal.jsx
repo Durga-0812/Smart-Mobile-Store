@@ -6,7 +6,7 @@ import "./CartModal.css";
 const FREE_SHIPPING_LIMIT = 2000;
 const SHIPPING_CHARGE = 99;
 const TAX_RATE = 0.1;
-const API_URL = "https://techlite-5x6a.onrender.com/api/v1";
+const API_URL = "http://127.0.0.1:8000/api/v1";
 
 export default function CartModal({
   isOpen,

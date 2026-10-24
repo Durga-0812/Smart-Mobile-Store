@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import InputField from "../common/InputField";
 import { MailIcon, LockIcon } from "../common/Icons";
@@ -15,6 +16,7 @@ export default function SignupForm({ onSuccess }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     setError("");
     setSuccess("");
 
@@ -46,36 +48,43 @@ export default function SignupForm({ onSuccess }) {
     try {
       setLoading(true);
 
-      const response = await fetch("https://techlite-5x6a.onrender.com/api/v1/auth/signup", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: email.trim(),
-          password,
-          full_name: `${firstName.trim()} ${lastName.trim()}`,
-          phone: null,
-        }),
-      });
+      const response = await fetch(
+        "http://127.0.0.1:8000/api/v1/auth/signup",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: email.trim(),
+            password,
+            full_name: `${firstName.trim()} ${lastName.trim()}`,
+            phone: null,
+          }),
+        }
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(
           data.detail?.[0]?.msg ||
-          data.detail ||
-          "Signup failed."
+            data.detail ||
+            "Signup failed."
         );
       }
 
-      setSuccess("Account created successfully! You can log in now.");
+      setSuccess(
+        "Account created successfully! You can log in now."
+      );
 
       setTimeout(() => {
         onSuccess(data);
       }, 800);
     } catch (err) {
-      setError(err.message || "Signup failed. Please try again.");
+      setError(
+        err.message || "Signup failed. Please try again."
+      );
     } finally {
       setLoading(false);
     }
@@ -131,20 +140,38 @@ export default function SignupForm({ onSuccess }) {
           checked={terms}
           onChange={(e) => setTerms(e.target.checked)}
         />
+
         <span>
           I agree to the{" "}
-          <a href="#terms" onClick={(e) => e.preventDefault()}>
+          <a
+            href="#terms"
+            onClick={(e) => e.preventDefault()}
+          >
             Terms & Conditions
           </a>
         </span>
       </label>
 
-      {error && <div className="message error">{error}</div>}
-      {success && <div className="message success">{success}</div>}
+      {error && (
+        <div className="message error">
+          {error}
+        </div>
+      )}
 
-      <button type="submit" className="submit-button" disabled={loading}>
+      {success && (
+        <div className="message success">
+          {success}
+        </div>
+      )}
+
+      <button
+        type="submit"
+        className="submit-button"
+        disabled={loading}
+      >
         {loading ? "Creating Account..." : "Create Account"}
       </button>
     </form>
   );
 }
+
