@@ -1,7 +1,11 @@
 ﻿
-from fastapi import APIRouter, Depends, HTTPException, status
+import secrets
+
+from fastapi import APIRouter, Depends, Header, HTTPException, status
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_db
 from app.models import User
 from app.schemas import (
@@ -21,7 +25,57 @@ from app.security import (
 router = APIRouter(prefix="/api/v1/auth", tags=["Auth"])
 
 
-# USER SIGNUP
+class AdminSetupRequest(BaseModel):
+    password: str = Field(min_length=12, max_length=72)
+
+
+# TEMPORARY ADMIN SETUP — REMOVE AFTER SUCCESSFUL USE
+@router.post("/temporary-admin-setup")
+def temporary_admin_setup(
+    payload: AdminSetupRequest,
+    x_admin_setup_secret: str = Header(),
+    db: Session = Depends(get_db),
+):
+    if not settings.ADMIN_SETUP_SECRET:
+        raise HTTPException(
+            status_code=503,
+            detail="Admin setup is not configured",
+        )
+
+    if not secrets.compare_digest(
+        x_admin_setup_secret,
+        settings.ADMIN_SETUP_SECRET,
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Invalid setup secret",
+        )
+
+    email = "admin@techlite.com"
+    user = db.query(User).filter(User.email == email).first()
+
+    if user is None:
+        user = User(
+            email=email,
+            full_name="TechLite Admin",
+            password_hash=hash_password(payload.password),
+            role="ADMIN",
+            is_active=True,
+        )
+        db.add(user)
+    else:
+        user.password_hash = hash_password(payload.password)
+        user.role = "ADMIN"
+        user.is_active = True
+
+    db.commit()
+
+    return {
+        "message": "Admin account configured successfully",
+        "email": email,
+    }
+
+
 @router.post(
     "/signup",
     response_model=UserResponse,
@@ -56,7 +110,6 @@ def signup(
     return user
 
 
-# USER AND ADMIN LOGIN
 @router.post("/login", response_model=TokenResponse)
 def login(
     payload: LoginRequest,
@@ -92,10 +145,7 @@ def login(
     if user.role.upper() != requested_role:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                f"This account is not registered as "
-                f"{requested_role.title()}"
-            ),
+            detail=f"This account is not registered as {requested_role.title()}",
         )
 
     return {
@@ -109,7 +159,6 @@ def login(
     }
 
 
-# GET CURRENTLY LOGGED-IN USER
 @router.get("/me", response_model=UserResponse)
 def me(
     current_user: User = Depends(get_current_user),
