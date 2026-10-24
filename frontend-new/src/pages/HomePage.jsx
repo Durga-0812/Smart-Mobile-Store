@@ -10,7 +10,7 @@ import MyOrdersPanel from "../components/orders/MyOrdersPanel";
 import { useCart } from "../hooks/useCart";
 import "../styles/storefront.css";
 
-const API_URL = "http://127.0.0.1:8000/api/v1/products/";
+const API_URL = "https://techlite-5x6a.onrender.com/api/v1/products/";
 
 export default function HomePage({
   isAuthenticated,

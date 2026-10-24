@@ -8,7 +8,7 @@ import {
   PRODUCT_CATEGORIES,
 } from "../data/categories";
 
-const API = "http://127.0.0.1:8000/api/v1";
+const API = "https://techlite-5x6a.onrender.com/api/v1";
 
 const emptyProduct = {
   name: "",
