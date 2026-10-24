@@ -1,3 +1,4 @@
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -5,16 +6,6 @@ from app.database import get_db
 from app.models import CartItem, Product
 from app.schemas import ProductCreate, ProductUpdate, ProductResponse
 from app.security import require_admin
-
-
-router =APIRouter(
-    prefix = "/api/v1/products",
-    tags = ["products"]
-)
-
-@router.get("/")
-def get_products():
-    return {"message": "Products API is working!"}
 
 router = APIRouter(
     prefix="/api/v1/products",
@@ -29,7 +20,15 @@ def create_product(
     db: Session = Depends(get_db),
     admin=Depends(require_admin)
 ):
-    product = Product(**data.model_dump())
+    product_data = data.model_dump(exclude_unset=True)
+
+    if not product_data.get("image_url"):
+        raise HTTPException(
+            status_code=400,
+            detail="Product image URL is required"
+        )
+
+    product = Product(**product_data)
 
     db.add(product)
     db.commit()
@@ -46,13 +45,19 @@ def get_products(db: Session = Depends(get_db)):
 
 # READ: Get one product
 @router.get("/{product_id}", response_model=ProductResponse)
-def get_product(product_id: str, db: Session = Depends(get_db)):
+def get_product(
+    product_id: str,
+    db: Session = Depends(get_db)
+):
     product = db.query(Product).filter(
         Product.id == product_id
     ).first()
 
     if product is None:
-        raise HTTPException(status_code=404, detail="Product not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Product not found"
+        )
 
     return product
 
@@ -70,37 +75,12 @@ def update_product(
     ).first()
 
     if product is None:
-        raise HTTPException(status_code=404, detail="Product not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Product not found"
+        )
 
     changes = data.model_dump(exclude_unset=True)
 
     for field, value in changes.items():
-        setattr(product, field, value)
-
-    db.commit()
-    db.refresh(product)
-
-    return product
-
-
-# DELETE: Remove a product (admin only)
-@router.delete("/{product_id}")
-def delete_product(
-    product_id: str,
-    db: Session = Depends(get_db),
-    admin=Depends(require_admin)
-):
-    product = db.query(Product).filter(
-        Product.id == product_id
-    ).first()
-
-    if product is None:
-        raise HTTPException(status_code=404, detail="Product not found")
-
-    db.query(CartItem).filter(CartItem.product_id == product_id).delete(
-        synchronize_session=False
-    )
-    db.delete(product)
-    db.commit()
-
-    return {"message": "Product deleted successfully"}
+        seta
