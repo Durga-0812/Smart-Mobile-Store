@@ -48,15 +48,21 @@ const response = await fetch("https://smart-mobile-store.onrender.com/api/v1/aut
         }),
       });
 
-      const data = await response.json();
+      
+const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(
-          data.detail?.[0]?.msg ||
-          data.detail ||
-          "Failed to Login"
-        );
-      }
+if (!response.ok) {
+  const message =
+    typeof data.detail === "string"
+      ? data.detail
+      : Array.isArray(data.detail)
+        ? data.detail.map((item) => item.msg).join(", ")
+        : "Failed to Login";
+
+  throw new Error(`Login failed (${response.status}): ${message}`);
+}
+
+
 
     
 localStorage.setItem("access_token", data.access_token);
