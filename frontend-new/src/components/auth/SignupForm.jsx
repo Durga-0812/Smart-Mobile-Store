@@ -50,7 +50,7 @@ export default function SignupForm({ onSuccess }) {
 
       
 const response = await fetch(
-  "https://techlite-5x6a.onrender.com/api/v1/auth/signup",
+  "https://smart-mobile-store.onrender.com/api/v1/auth/signup",
   {
 
 

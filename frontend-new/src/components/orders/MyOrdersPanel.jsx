@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import "./MyOrdersPanel.css";
 
-const ORDERS_URL = "https://techlite-5x6a.onrender.com/api/v1/orders/my-orders";
+const ORDERS_URL = "https://smart-mobile-store.onrender.com/api/v1/orders/my-orders";
 
 const formatPrice = (value) =>
   new Intl.NumberFormat("en-IN", {

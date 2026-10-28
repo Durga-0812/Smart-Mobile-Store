@@ -2,7 +2,7 @@ import React, { createContext, useState, useEffect } from "react";
 
 export const CartContext = createContext(null);
 
-const API_URL = "https://techlite-5x6a.onrender.com/api/v1/cart";
+const API_URL = "https://smart-mobile-store.onrender.com/api/v1/cart";
 
 async function requestCart(path = "", options = {}) {
   const token = localStorage.getItem("access_token");

@@ -8,7 +8,7 @@ import {
   PRODUCT_CATEGORIES,
 } from "../data/categories";
 
-const API = "https://techlite-5x6a.onrender.com/api/v1";
+const API = "https://smart-mobile-store.onrender.com/api/v1";
 
 const emptyProduct = {
   name: "",
