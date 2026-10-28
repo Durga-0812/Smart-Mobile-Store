@@ -58,8 +58,11 @@ const response = await fetch("https://smart-mobile-store.onrender.com/api/v1/aut
         );
       }
 
-      localStorage.setItem("access_token", data.access_token);
-      localStorage.setItem("full_name", data.full_name || "");
+    
+localStorage.setItem("access_token", data.access_token);
+localStorage.setItem("full_name", data.full_name || "");
+localStorage.setItem("role", String(data.role || role).toUpperCase());
+
 
       if (remember) {
         localStorage.setItem("remember_me", "true");
