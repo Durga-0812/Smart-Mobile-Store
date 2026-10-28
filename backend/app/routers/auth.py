@@ -36,6 +36,7 @@ def temporary_admin_setup(
     x_admin_setup_secret: str = Header(),
     db: Session = Depends(get_db),
 ):
+
     if not settings.ADMIN_SETUP_SECRET:
         raise HTTPException(
             status_code=503,
@@ -43,13 +44,15 @@ def temporary_admin_setup(
         )
 
     if not secrets.compare_digest(
-        x_admin_setup_secret,
-        settings.ADMIN_SETUP_SECRET,
+        x_admin_setup_secret.strip(),
+        settings.ADMIN_SETUP_SECRET.strip(),
     ):
         raise HTTPException(
             status_code=403,
             detail="Invalid setup secret",
         )
+
+
 
     email = "admin@techlite.com"
     user = db.query(User).filter(User.email == email).first()
