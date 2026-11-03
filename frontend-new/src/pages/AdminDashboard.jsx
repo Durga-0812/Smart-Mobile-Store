@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import "./AdminDashboard.css";
 import AdminOrders from "../components/admin/AdminOrders";
+import AdminMessages from "../components/admin/AdminMessages";
 import {
   getCanonicalCategory,
   getCategoryId,
@@ -8,7 +9,7 @@ import {
   PRODUCT_CATEGORIES,
 } from "../data/categories";
 
-const API = "https://smart-mobile-store.onrender.com/api/v1";
+const API = "http://127.0.0.1:8000/api/v1";
 
 const emptyProduct = {
   name: "",
@@ -19,11 +20,86 @@ const emptyProduct = {
   image_url: "",
 };
 
+const CSV_HEADERS = [
+  "name",
+  "description",
+  "price",
+  "category",
+  "stock_quantity",
+  "image_url",
+];
+
+// Parse CSV rows, including commas inside quoted values.
+function parseCSV(text) {
+  const rows = [];
+  let row = [];
+  let value = "";
+  let insideQuotes = false;
+
+  const input = text.replace(/^\uFEFF/, "");
+
+  for (let i = 0; i < input.length; i++) {
+    const char = input[i];
+
+    if (char === '"' && insideQuotes && input[i + 1] === '"') {
+      value += '"';
+      i++;
+    } else if (char === '"') {
+      insideQuotes = !insideQuotes;
+    } else if (char === "," && !insideQuotes) {
+      row.push(value.trim());
+      value = "";
+    } else if (
+      (char === "\n" || char === "\r") &&
+      !insideQuotes
+    ) {
+      if (char === "\r" && input[i + 1] === "\n") {
+        i++;
+      }
+
+      row.push(value.trim());
+
+      if (row.some((cell) => cell !== "")) {
+        rows.push(row);
+      }
+
+      row = [];
+      value = "";
+    } else {
+      value += char;
+    }
+  }
+
+  if (insideQuotes) {
+    throw new Error("CSV has an unclosed quotation mark.");
+  }
+
+  row.push(value.trim());
+
+  if (row.some((cell) => cell !== "")) {
+    rows.push(row);
+  }
+
+  return rows;
+}
+
+function isValidImageURL(value) {
+  if (!value) return true;
+
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
 export default function AdminDashboard({ fullName, onLogout }) {
   const [section, setSection] = useState("Dashboard");
   const [theme, setTheme] = useState(
     () => localStorage.getItem("techlite_theme") || "light"
   );
+
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -34,6 +110,9 @@ export default function AdminDashboard({ fullName, onLogout }) {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyProduct);
   const [saving, setSaving] = useState(false);
+
+  const [bulkUploading, setBulkUploading] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState("");
 
   const token = () => localStorage.getItem("access_token");
 
@@ -49,7 +128,9 @@ export default function AdminDashboard({ fullName, onLogout }) {
       const [productResponse, customerResponse] = await Promise.all([
         fetch(`${API}/products/`),
         fetch(`${API}/auth/admin/users`, {
-          headers: { Authorization: `Bearer ${token()}` },
+          headers: {
+            Authorization: `Bearer ${token()}`,
+          },
         }),
       ]);
 
@@ -58,6 +139,7 @@ export default function AdminDashboard({ fullName, onLogout }) {
       }
 
       const productData = await productResponse.json();
+
       setProducts(Array.isArray(productData) ? productData : []);
 
       if (customerResponse.ok) {
@@ -87,6 +169,7 @@ export default function AdminDashboard({ fullName, onLogout }) {
 
   function openEditForm(product) {
     setEditingId(product.id);
+
     setForm({
       name: product.name ?? "",
       description: product.description ?? "",
@@ -95,6 +178,7 @@ export default function AdminDashboard({ fullName, onLogout }) {
       stock_quantity: String(product.stock_quantity ?? ""),
       image_url: product.image_url ?? "",
     });
+
     setError("");
     setNotice("");
     setShowForm(true);
@@ -102,7 +186,11 @@ export default function AdminDashboard({ fullName, onLogout }) {
 
   function updateField(event) {
     const { name, value } = event.target;
-    setForm((previous) => ({ ...previous, [name]: value }));
+
+    setForm((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
   }
 
   async function saveProduct(event) {
@@ -118,7 +206,11 @@ export default function AdminDashboard({ fullName, onLogout }) {
       return;
     }
 
-    if (form.price.trim() === "" || !Number.isFinite(price) || price < 0) {
+    if (
+      form.price.trim() === "" ||
+      !Number.isFinite(price) ||
+      price < 0
+    ) {
       setError("Enter a valid non-negative price.");
       return;
     }
@@ -129,6 +221,16 @@ export default function AdminDashboard({ fullName, onLogout }) {
       stock < 0
     ) {
       setError("Stock quantity must be a non-negative whole number.");
+      return;
+    }
+
+    if (!form.category) {
+      setError("Please select a category.");
+      return;
+    }
+
+    if (!isValidImageURL(form.image_url.trim())) {
+      setError("Image URL must start with http:// or https://.");
       return;
     }
 
@@ -162,9 +264,11 @@ export default function AdminDashboard({ fullName, onLogout }) {
 
       if (!response.ok) {
         const detail = data?.detail;
+
         const message = Array.isArray(detail)
           ? detail.map((item) => item.msg).join(", ")
           : detail;
+
         throw new Error(
           message ||
             `Unable to ${editingId ? "update" : "create"} product.`
@@ -174,6 +278,7 @@ export default function AdminDashboard({ fullName, onLogout }) {
       setShowForm(false);
       setForm({ ...emptyProduct });
       setEditingId(null);
+
       setNotice(
         editingId
           ? "Product updated successfully."
@@ -188,6 +293,199 @@ export default function AdminDashboard({ fullName, onLogout }) {
     }
   }
 
+  async function handleBulkUpload(event) {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    setError("");
+    setNotice("");
+    setBulkProgress("");
+
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      setError("Please select a CSV file.");
+      event.target.value = "";
+      return;
+    }
+
+    if (!token()) {
+      setError("Your login session is missing. Please log in again.");
+      event.target.value = "";
+      return;
+    }
+
+    setBulkUploading(true);
+
+    try {
+      const text = await file.text();
+      const parsedRows = parseCSV(text);
+
+      if (parsedRows.length < 2) {
+        throw new Error("The CSV file does not contain product rows.");
+      }
+
+      const headers = parsedRows[0].map((header) =>
+        header.trim().toLowerCase()
+      );
+
+      const missingHeaders = CSV_HEADERS.filter(
+        (header) => !headers.includes(header)
+      );
+
+      if (missingHeaders.length > 0) {
+        throw new Error(
+          `Missing CSV columns: ${missingHeaders.join(", ")}`
+        );
+      }
+
+      const rows = parsedRows.slice(1).map((values) => {
+        const row = {};
+
+        headers.forEach((header, index) => {
+          row[header] = values[index] ?? "";
+        });
+
+        return row;
+      });
+
+      if (rows.length > 50) {
+        throw new Error(
+          "Please upload a maximum of 50 products in one CSV file."
+        );
+      }
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const price = Number(row.price);
+        const stock = Number(row.stock_quantity);
+
+        if (!row.name.trim()) {
+          throw new Error(`Row ${i + 2}: Product name is required.`);
+        }
+
+        if (
+          row.price.trim() === "" ||
+          !Number.isFinite(price) ||
+          price < 0
+        ) {
+          throw new Error(`Row ${i + 2}: Invalid product price.`);
+        }
+
+        if (
+          row.stock_quantity.trim() === "" ||
+          !Number.isInteger(stock) ||
+          stock < 0
+        ) {
+          throw new Error(
+            `Row ${i + 2}: Stock must be a whole number of 0 or more.`
+          );
+        }
+
+        if (!row.category.trim()) {
+          throw new Error(`Row ${i + 2}: Category is required.`);
+        }
+
+        if (!isValidImageURL(row.image_url.trim())) {
+          throw new Error(
+            `Row ${i + 2}: Image URL must start with http:// or https://.`
+          );
+        }
+      }
+
+      const duplicateNames = new Set();
+      const namesInFile = new Set();
+
+      for (const row of rows) {
+        const normalizedName = row.name.trim().toLowerCase();
+
+        if (namesInFile.has(normalizedName)) {
+          duplicateNames.add(row.name.trim());
+        }
+
+        namesInFile.add(normalizedName);
+      }
+
+      if (duplicateNames.size > 0) {
+        throw new Error(
+          `Duplicate product names in CSV: ${Array.from(
+            duplicateNames
+          ).join(", ")}`
+        );
+      }
+
+      const confirmed = window.confirm(
+        `You are about to add ${rows.length} products to the live store. Continue?`
+      );
+
+      if (!confirmed) return;
+
+      let added = 0;
+      const failed = [];
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+
+        setBulkProgress(
+          `Uploading product ${i + 1} of ${rows.length}: ${row.name}`
+        );
+
+        const payload = {
+          name: row.name.trim(),
+          description: row.description.trim(),
+          price: Number(row.price),
+          category: getCanonicalCategory(row.category.trim()),
+          stock_quantity: Number(row.stock_quantity),
+          image_url: row.image_url.trim() || null,
+        };
+
+        try {
+          const response = await fetch(`${API}/products/`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token()}`,
+            },
+            body: JSON.stringify(payload),
+          });
+
+          const data = await response.json().catch(() => null);
+
+          if (!response.ok) {
+            const detail = data?.detail;
+
+            const message = Array.isArray(detail)
+              ? detail.map((item) => item.msg).join(", ")
+              : detail;
+
+            throw new Error(message || `HTTP ${response.status}`);
+          }
+
+          added++;
+        } catch (err) {
+          failed.push(`${row.name}: ${err.message}`);
+        }
+      }
+
+      await loadData();
+
+      setNotice(
+        `Bulk upload finished: ${added} products added, ${failed.length} failed.`
+      );
+
+      if (failed.length > 0) {
+        setError(
+          "Some products failed: " + failed.slice(0, 5).join(" | ")
+        );
+      }
+    } catch (err) {
+      setError(err.message || "Unable to upload CSV.");
+    } finally {
+      setBulkUploading(false);
+      setBulkProgress("");
+      event.target.value = "";
+    }
+  }
+
   async function deleteProduct(product) {
     const confirmed = window.confirm(
       `Are you sure you want to delete "${product.name}"?`
@@ -199,19 +497,17 @@ export default function AdminDashboard({ fullName, onLogout }) {
     setNotice("");
 
     try {
-      const response = await fetch(
-        `${API}/products/${product.id}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token()}`,
-          },
-        }
-      );
+      const response = await fetch(`${API}/products/${product.id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token()}`,
+        },
+      });
 
       if (!response.ok) {
         const data = await response.json().catch(() => null);
         const detail = data?.detail;
+
         throw new Error(
           (typeof detail === "string" && detail) ||
             "Unable to delete product."
@@ -234,6 +530,7 @@ export default function AdminDashboard({ fullName, onLogout }) {
     ["Messages", "✉"],
     ["Settings", "⚙"],
   ];
+
   const categorySummaries = PRODUCT_CATEGORIES.map((category) => ({
     ...category,
     productCount: products.filter(
@@ -337,14 +634,59 @@ export default function AdminDashboard({ fullName, onLogout }) {
                   </h2>
 
                   {section === "Products" && (
-                    <button
-                      className="admin-add-button"
-                      onClick={openAddForm}
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "10px",
+                        flexWrap: "wrap",
+                      }}
                     >
-                      + Add Product
-                    </button>
+                      <button
+                        className="admin-add-button"
+                        onClick={openAddForm}
+                        disabled={bulkUploading}
+                      >
+                        + Add Product
+                      </button>
+
+                      <label
+                        className="admin-add-button"
+                        style={{
+                          cursor: bulkUploading
+                            ? "not-allowed"
+                            : "pointer",
+                          opacity: bulkUploading ? 0.6 : 1,
+                        }}
+                      >
+                        {bulkUploading
+                          ? "Uploading..."
+                          : "Bulk Upload CSV"}
+
+                        <input
+                          type="file"
+                          accept=".csv,text/csv"
+                          onChange={handleBulkUpload}
+                          disabled={bulkUploading}
+                          style={{ display: "none" }}
+                        />
+                      </label>
+                    </div>
                   )}
                 </div>
+              )}
+
+              {bulkProgress && (
+                <p role="status" aria-live="polite">
+                  {bulkProgress}
+                </p>
+              )}
+
+              {section === "Products" && (
+                <p>
+                  CSV upload supports up to 50 products at a time.
+                  Each row must include a product name, category, price,
+                  stock quantity, and an optional direct image URL.
+                </p>
               )}
 
               {showForm && section === "Products" && (
@@ -366,7 +708,7 @@ export default function AdminDashboard({ fullName, onLogout }) {
                     </label>
 
                     <label>
-                      Category
+                      Category *
                       <select
                         name="category"
                         value={form.category}
@@ -376,6 +718,7 @@ export default function AdminDashboard({ fullName, onLogout }) {
                         <option value="" disabled>
                           Choose a category
                         </option>
+
                         {PRODUCT_CATEGORIES.map((category) => (
                           <option key={category.id} value={category.name}>
                             {category.name}
@@ -421,6 +764,29 @@ export default function AdminDashboard({ fullName, onLogout }) {
                       />
                     </label>
 
+                    {form.image_url && (
+                      <div className="product-form-full">
+                        <p>Image preview:</p>
+                        <img
+                          src={form.image_url}
+                          alt="Product preview"
+                          style={{
+                            width: "140px",
+                            height: "140px",
+                            objectFit: "contain",
+                            border: "1px solid #ddd",
+                            borderRadius: "8px",
+                          }}
+                          onError={(event) => {
+                            event.currentTarget.style.display = "none";
+                          }}
+                          onLoad={(event) => {
+                            event.currentTarget.style.display = "block";
+                          }}
+                        />
+                      </div>
+                    )}
+
                     <label className="product-form-full">
                       Description
                       <textarea
@@ -433,7 +799,7 @@ export default function AdminDashboard({ fullName, onLogout }) {
                   </div>
 
                   <div className="product-form-actions">
-                    <button type="submit" disabled={saving}>
+                    <button type="submit" disabled={saving || bulkUploading}>
                       {saving
                         ? "Saving..."
                         : editingId
@@ -448,7 +814,7 @@ export default function AdminDashboard({ fullName, onLogout }) {
                         setShowForm(false);
                         setError("");
                       }}
-                      disabled={saving}
+                      disabled={saving || bulkUploading}
                     >
                       Cancel
                     </button>
@@ -464,6 +830,7 @@ export default function AdminDashboard({ fullName, onLogout }) {
                     <table className="admin-table">
                       <thead>
                         <tr>
+                          <th>Image</th>
                           <th>Product</th>
                           <th>Category</th>
                           <th>Price</th>
@@ -471,9 +838,31 @@ export default function AdminDashboard({ fullName, onLogout }) {
                           {section === "Products" && <th>Actions</th>}
                         </tr>
                       </thead>
+
                       <tbody>
                         {products.map((product) => (
                           <tr key={product.id}>
+                            <td>
+                              {product.image_url ? (
+                                <img
+                                  src={product.image_url}
+                                  alt={product.name}
+                                  loading="lazy"
+                                  style={{
+                                    width: "55px",
+                                    height: "55px",
+                                    objectFit: "contain",
+                                    borderRadius: "6px",
+                                  }}
+                                  onError={(event) => {
+                                    event.currentTarget.style.display = "none";
+                                  }}
+                                />
+                              ) : (
+                                "No image"
+                              )}
+                            </td>
+
                             <td>{product.name}</td>
                             <td>{getCategoryName(product.category)}</td>
                             <td>
@@ -498,6 +887,7 @@ export default function AdminDashboard({ fullName, onLogout }) {
                                     type="button"
                                     className="delete-button"
                                     onClick={() => deleteProduct(product)}
+                                    disabled={bulkUploading}
                                   >
                                     Delete
                                   </button>
@@ -523,6 +913,7 @@ export default function AdminDashboard({ fullName, onLogout }) {
                           <th>Role</th>
                         </tr>
                       </thead>
+
                       <tbody>
                         {customers.map((customer) => (
                           <tr key={customer.id}>
@@ -544,11 +935,14 @@ export default function AdminDashboard({ fullName, onLogout }) {
                       <span className="admin-category-icon" aria-hidden="true">
                         {category.icon}
                       </span>
+
                       <div>
                         <h3>{category.name}</h3>
                         <p>
                           <strong>{category.productCount}</strong>{" "}
-                          {category.productCount === 1 ? "product" : "products"}
+                          {category.productCount === 1
+                            ? "product"
+                            : "products"}
                         </p>
                       </div>
                     </article>
@@ -558,16 +952,25 @@ export default function AdminDashboard({ fullName, onLogout }) {
                 <div className="admin-settings">
                   <div>
                     <h3>Appearance</h3>
-                    <p>Choose the theme used across the TechLite dashboard and store.</p>
+                    <p>
+                      Choose the theme used across the TechLite dashboard
+                      and store.
+                    </p>
                   </div>
+
                   <div className="admin-setting-row">
                     <div>
                       <strong>Dark mode</strong>
-                      <span>Reduce brightness with a darker interface.</span>
+                      <span>
+                        Reduce brightness with a darker interface.
+                      </span>
                     </div>
+
                     <button
                       type="button"
-                      className={`admin-theme-switch ${theme === "dark" ? "enabled" : ""}`}
+                      className={`admin-theme-switch ${
+                        theme === "dark" ? "enabled" : ""
+                      }`}
                       role="switch"
                       aria-checked={theme === "dark"}
                       aria-label="Dark mode"
@@ -581,12 +984,9 @@ export default function AdminDashboard({ fullName, onLogout }) {
                     </button>
                   </div>
                 </div>
-              ) : section !== "Dashboard" && section !== "Products" ? (
-                <p>
-                  The {section.toLowerCase()} section requires its corresponding
-                  backend functionality before it can manage real data.
-                </p>
-              ) : null}
+             ) : section === "Messages" ? (
+  <AdminMessages />
+) : null}
             </section>
           </>
         )}

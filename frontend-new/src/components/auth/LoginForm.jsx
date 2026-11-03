@@ -2,7 +2,11 @@ import React, { useState } from "react";
 import InputField from "../common/InputField";
 import { MailIcon, LockIcon } from "../common/Icons";
 
-export default function LoginForm({ onSuccess, role = "USER" }) {
+export default function LoginForm({
+  onSuccess,
+  onForgotPassword,
+  role = "USER",
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
@@ -26,49 +30,38 @@ export default function LoginForm({ onSuccess, role = "USER" }) {
       return;
     }
 
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
-      return;
-    }
-
     try {
       setLoading(true);
 
-    
-const response = await fetch("https://smart-mobile-store.onrender.com/api/v1/auth/login", 
-   {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: email.trim(),
-          password,
-          role,
-        }),
-      });
+      const response = await fetch(
+  "http://127.0.0.1:8000/api/v1/auth/login",
+  {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email: email.trim(),
+      password,
+      role,
+    }),
+  }
+);
 
-      
-const data = await response.json();
+      const data = await response.json();
 
-if (!response.ok) {
-  const message =
-    typeof data.detail === "string"
-      ? data.detail
-      : Array.isArray(data.detail)
-        ? data.detail.map((item) => item.msg).join(", ")
-        : "Failed to Login";
+      if (!response.ok) {
+        throw new Error(
+          data.detail || "Failed to login."
+        );
+      }
 
-  throw new Error(`Login failed (${response.status}): ${message}`);
-}
-
-
-
-    
-localStorage.setItem("access_token", data.access_token);
-localStorage.setItem("full_name", data.full_name || "");
-localStorage.setItem("role", String(data.role || role).toUpperCase());
-
+      localStorage.setItem("access_token", data.access_token);
+      localStorage.setItem("full_name", data.full_name || "");
+      localStorage.setItem(
+        "role",
+        String(data.role || role).toUpperCase()
+      );
 
       if (remember) {
         localStorage.setItem("remember_me", "true");
@@ -81,8 +74,9 @@ localStorage.setItem("role", String(data.role || role).toUpperCase());
       setTimeout(() => {
         onSuccess(data);
       }, 600);
+
     } catch (err) {
-      setError(err.message || "Login failed. Please try again.");
+      setError(err.message || "Login failed.");
     } finally {
       setLoading(false);
     }
@@ -90,24 +84,27 @@ localStorage.setItem("role", String(data.role || role).toUpperCase());
 
   return (
     <form className="auth-form" onSubmit={handleSubmit}>
+
       <InputField
         label="Email Address"
         type="email"
+        name="email"
         placeholder="Enter your email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         icon={<MailIcon />}
-        autoComplete="email"
+        required
       />
 
       <InputField
         label="Password"
         type="password"
+        name="password"
         placeholder="Enter your password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         icon={<LockIcon />}
-        autoComplete="current-password"
+        required
       />
 
       <div className="login-options">
@@ -120,17 +117,26 @@ localStorage.setItem("role", String(data.role || role).toUpperCase());
           <span>Remember me</span>
         </label>
 
-        <a href="#forgot" onClick={(e) => e.preventDefault()}>
+        <button
+          type="button"
+          className="forgot-link"
+          onClick={onForgotPassword}
+        >
           Forgot password?
-        </a>
+        </button>
       </div>
 
       {error && <div className="message error">{error}</div>}
       {success && <div className="message success">{success}</div>}
 
-      <button type="submit" className="submit-button" disabled={loading}>
+      <button
+        type="submit"
+        className="submit-button"
+        disabled={loading}
+      >
         {loading ? "Logging in..." : "Login"}
       </button>
+
     </form>
   );
 }

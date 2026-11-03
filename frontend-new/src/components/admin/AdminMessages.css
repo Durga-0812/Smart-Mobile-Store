@@ -1,0 +1,169 @@
+.admin-messages {
+width: 100%;
+padding: 10px 0;
+color: var(--text-primary, #222);
+}
+
+.messages-header {
+display: flex;
+align-items: center;
+justify-content: space-between;
+gap: 16px;
+margin-bottom: 24px;
+}
+
+.messages-header h2 {
+margin: 0 0 8px;
+font-size: 24px;
+}
+
+.messages-header p {
+margin: 0;
+color: var(--text-secondary, #777);
+font-size: 14px;
+}
+
+.messages-refresh,
+.message-actions button {
+padding: 9px 15px;
+border: 1px solid var(--border-color, #ddd);
+border-radius: 8px;
+background: var(--card-bg, #fff);
+color: var(--text-primary, #222);
+font-weight: 600;
+cursor: pointer;
+}
+
+.messages-refresh:hover,
+.message-actions button:hover {
+border-color: #8b5cf6;
+color: #8b5cf6;
+}
+
+.messages-list {
+display: flex;
+flex-direction: column;
+gap: 16px;
+}
+
+.message-card {
+padding: 20px;
+border: 1px solid var(--border-color, #ddd);
+border-radius: 12px;
+background: var(--card-bg, #fff);
+}
+
+.message-card.unread {
+border-left: 4px solid #8b5cf6;
+}
+
+.message-card-header {
+display: flex;
+justify-content: space-between;
+align-items: flex-start;
+gap: 15px;
+}
+
+.message-card-header h3 {
+margin: 0 0 8px;
+font-size: 17px;
+}
+
+.message-sender {
+margin: 0 0 7px;
+font-size: 14px;
+color: var(--text-secondary, #777);
+overflow-wrap: anywhere;
+}
+
+.message-card-header small {
+color: var(--text-secondary, #888);
+}
+
+.message-status {
+padding: 5px 11px;
+border-radius: 20px;
+font-size: 12px;
+font-weight: 700;
+white-space: nowrap;
+}
+
+.message-status.unread {
+background: #ede9fe;
+color: #6d28d9;
+}
+
+.message-status.read {
+background: #dcfce7;
+color: #166534;
+}
+
+.message-full-content {
+margin-top: 18px;
+padding: 16px;
+border-radius: 9px;
+background: var(--page-bg, #f8fafc);
+font-size: 14px;
+line-height: 1.7;
+white-space: pre-wrap;
+overflow-wrap: anywhere;
+}
+
+.message-actions {
+display: flex;
+flex-wrap: wrap;
+gap: 10px;
+margin-top: 18px;
+}
+
+.message-actions button:disabled {
+opacity: 0.5;
+cursor: not-allowed;
+}
+
+.message-actions .message-delete {
+color: #dc2626;
+border-color: #fecaca;
+}
+
+.message-actions .message-delete:hover {
+background: #fee2e2;
+color: #b91c1c;
+}
+
+.messages-empty {
+padding: 55px 20px;
+border: 1px dashed var(--border-color, #ddd);
+border-radius: 12px;
+text-align: center;
+}
+
+.messages-empty h3 {
+margin: 0 0 10px;
+}
+
+.messages-empty p {
+color: var(--text-secondary, #777);
+}
+
+.messages-error {
+padding: 13px;
+margin-bottom: 18px;
+border-radius: 8px;
+background: #fee2e2;
+color: #991b1b;
+}
+
+@media (max-width: 600px) {
+.messages-header {
+align-items: flex-start;
+}
+
+.message-card {
+padding: 15px;
+}
+
+.message-card-header {
+flex-direction: column;
+}
+}

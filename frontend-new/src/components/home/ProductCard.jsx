@@ -9,63 +9,86 @@ export default function ProductCard({
   onProductClick,
 }) {
   const { addToCart, cartItems = [] } = useCart();
+
   const [added, setAdded] = useState(false);
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState("");
 
-  // Support both frontend and backend field names.
   const price = Number(product.price ?? product.priceNum);
   const image = getProductImageUrl(product);
   const name = product.name ?? "Unnamed Product";
+
   const cartQuantity = Number(
-    cartItems.find((item) => String(item.id) === String(product.id))
-      ?.quantity ?? 0
+    cartItems.find(
+      (item) => String(item.id) === String(product.id)
+    )?.quantity ?? 0
   );
+
   const stock = Number(product.stock_quantity);
+
   const hasStockInfo =
     product.stock_quantity !== undefined &&
     product.stock_quantity !== null &&
     Number.isFinite(stock);
+
   const outOfStock = hasStockInfo && stock <= 0;
+
   const stockMessage = outOfStock
     ? "Out of stock"
     : stock <= 5
-      ? "Very low stock"
-      : stock <= 20
-        ? "Only few stock left"
-        : "";
+    ? "Very low stock"
+    : stock <= 20
+    ? "Only few stock left"
+    : "";
+
   const buttonLabel = outOfStock
     ? "Out of Stock"
     : adding
-      ? "Adding..."
-      : added
-      ? "Added! ✓"
-      : isAuthenticated
-        ? "Add to Cart"
-        : "Login / Sign up to add";
+    ? "Adding..."
+    : added
+    ? "Added! ✓"
+    : isAuthenticated
+    ? "Add to Cart"
+    : "Login / Sign up to add";
 
   const hasProductPhoto =
     typeof image === "string" &&
-    image.trim() !== "" &&
-    (/^https?:\/\//i.test(image) ||
-      /\.(avif|gif|jpe?g|png|webp)(\?.*)?$/i.test(image));
+    /^https?:\/\//i.test(image.trim());
 
-  const handleAdd = async () => {
-    if (outOfStock) return;
+  const handleAdd = async (event) => {
+    event.stopPropagation();
+
+    // Temporary click test
+    
+
+    if (adding || outOfStock) return;
 
     if (!isAuthenticated) {
       onLoginClick?.();
       return;
     }
 
+    if (!product?.id) {
+      setAddError("Product ID is missing.");
+      return;
+    }
+
     setAdding(true);
     setAddError("");
+
     try {
       await addToCart(product);
+
       setAdded(true);
-      setTimeout(() => setAdded(false), 1200);
+
+      setTimeout(() => {
+        setAdded(false);
+      }, 1500);
     } catch (error) {
-      setAddError(error.message || "Unable to add this product to your cart.");
+      console.error("Add to cart failed:", error);
+      setAddError(
+        error.message || "Unable to add this product to your cart."
+      );
     } finally {
       setAdding(false);
     }
@@ -73,23 +96,31 @@ export default function ProductCard({
 
   return (
     <div
-  className="product"
-  onClick={() => onProductClick?.(product)}
-  role={onProductClick ? "button" : undefined}
-  tabIndex={onProductClick ? 0 : undefined}
-  onKeyDown={(event) => {
-    if (
-      event.target === event.currentTarget &&
-      (event.key === "Enter" || event.key === " ")
-    ) {
-      event.preventDefault();
-      onProductClick?.(product);
-    }
-  }}
->
+      className="product"
+      onClick={() => onProductClick?.(product)}
+      role={onProductClick ? "button" : undefined}
+      tabIndex={onProductClick ? 0 : undefined}
+      onKeyDown={(event) => {
+        if (
+          event.target === event.currentTarget &&
+          (event.key === "Enter" || event.key === " ")
+        ) {
+          event.preventDefault();
+          onProductClick?.(product);
+        }
+      }}
+    >
       <div className="product-image">
         {hasProductPhoto ? (
-          <img src={image} alt={name} loading="lazy" />
+          <img
+            src={image}
+            alt={name}
+            loading="lazy"
+            onError={(event) => {
+              event.currentTarget.onerror = null;
+              event.currentTarget.style.display = "none";
+            }}
+          />
         ) : (
           <div className="product-render">
             <span className="product-render-camera" />
@@ -108,7 +139,9 @@ export default function ProductCard({
 
       {hasStockInfo && stockMessage && (
         <p
-          className={`product-stock ${stock <= 5 ? "product-stock-low" : ""}`}
+          className={`product-stock ${
+            stock <= 5 ? "product-stock-low" : ""
+          }`}
           role="status"
         >
           {stockMessage}
@@ -122,12 +155,11 @@ export default function ProductCard({
       )}
 
       <button
-        className={`buy-btn ${added ? "added" : ""} ${!isAuthenticated ? "login-required" : ""}`}
+        className={`buy-btn ${added ? "added" : ""} ${
+          !isAuthenticated ? "login-required" : ""
+        }`}
         type="button"
-        onClick={(event) => {
-  event.stopPropagation();
-  handleAdd();
-}}
+        onClick={handleAdd}
         disabled={
           adding ||
           outOfStock ||
@@ -135,11 +167,9 @@ export default function ProductCard({
         }
       >
         <span>{buttonLabel}</span>
+
         {cartQuantity > 0 && isAuthenticated && !outOfStock && (
-          <span
-            className="buy-btn-cart-count"
-            aria-label={`${cartQuantity} in cart`}
-          >
+          <span className="buy-btn-cart-count">
             {cartQuantity}
           </span>
         )}

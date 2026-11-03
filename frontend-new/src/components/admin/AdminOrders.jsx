@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from "react";
 import "./AdminOrders.css";
-const API = "https://smart-mobile-store.onrender.com/api/v1";
+const API = "http://127.0.0.1:8000/api/v1";
 
 
 

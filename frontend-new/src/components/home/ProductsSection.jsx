@@ -94,16 +94,21 @@ export default function ProductsSection({
           No products found matching "{searchQuery}".
         </p>
       ) : (
-        <div className="product-container">
-          {filteredProducts.map((prod) => (
-            <ProductCard
-              key={prod.id}
-              product={prod}
-              isAuthenticated={isAuthenticated}
-              onLoginClick={onLoginClick}
-            />
-          ))}
-        </div>
+       <>
+  <p>Total products displayed: {filteredProducts.length}</p>
+
+  <div className="product-container">
+    {filteredProducts.map((prod) => (
+      <ProductCard
+        key={prod.id}
+        product={prod}
+        isAuthenticated={isAuthenticated}
+        onLoginClick={onLoginClick}
+        onProductClick={onProductClick}
+      />
+    ))}
+  </div>
+</>
       )}
     </section>
   );

@@ -84,6 +84,7 @@ const CATEGORY_ALIASES = new Map([
   ["watches", "smartwatches"],
   ["accessory", "accessories"],
   ["accessories", "accessories"],
+  ["gaming", "accessories"],
 ]);
 
 export function getCategoryId(category) {

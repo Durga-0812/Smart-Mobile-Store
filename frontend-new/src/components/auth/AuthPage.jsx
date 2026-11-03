@@ -1,12 +1,15 @@
-import React from "react";
+import React, { useState } from "react";
 import LoginForm from "./LoginForm";
 import SignupForm from "./SignupForm";
+import ForgotPasswordForm from "./ForgotPasswordForm";
+
 import {
   BackArrowIcon,
   GoogleIcon,
   FacebookIcon,
   LogoMark,
 } from "../common/Icons";
+
 import "./AuthPage.css";
 
 export default function AuthPage({
@@ -17,7 +20,15 @@ export default function AuthPage({
   onClose,
   onLoginSuccess,
 }) {
+  const [showForgotPassword, setShowForgotPassword] =
+    useState(false);
+
   const isSignup = mode === "signup";
+
+  const goToLogin = () => {
+    setShowForgotPassword(false);
+    setMode("login");
+  };
 
   return (
     <main
@@ -29,9 +40,9 @@ export default function AuthPage({
         className="auth-card"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="auth-heading"
         onClick={(event) => event.stopPropagation()}
       >
+
         <div className="image-panel">
           <div className="image-overlay">
             <div className="logo-mark">
@@ -41,105 +52,141 @@ export default function AuthPage({
         </div>
 
         <div className="form-panel">
+
           <button
             type="button"
             className="back-button"
-            onClick={onClose}
-            aria-label="Back to homepage"
+            onClick={
+              showForgotPassword
+                ? goToLogin
+                : onClose
+            }
+            aria-label="Back"
           >
             <BackArrowIcon />
           </button>
 
           <div className="heading-area">
-            <h1 id="auth-heading">
-              {isSignup
-                ? "Create an Account"
-                : loginRole === "ADMIN"
-                  ? "Admin Login"
-                  : "Welcome Back"}
+
+            <h1>
+              {showForgotPassword
+                ? "Forgot Password"
+                : isSignup
+                  ? "Create an Account"
+                  : loginRole === "ADMIN"
+                    ? "Admin Login"
+                    : "Welcome Back"}
             </h1>
 
-            {!isSignup && (
-              <div className="login-role-options">
-                <button
-                  type="button"
-                  className={loginRole === "USER" ? "active" : ""}
-                  onClick={() => setLoginRole("USER")}
-                >
-                  User Login
-                </button>
+            {showForgotPassword ? (
+              <p>
+                Enter your registered email to receive a password reset OTP.
+              </p>
+            ) : (
+              <>
+                {!isSignup && (
+                  <div className="login-role-options">
 
-                <button
-                  type="button"
-                  className={loginRole === "ADMIN" ? "active" : ""}
-                  onClick={() => setLoginRole("ADMIN")}
-                >
-                  Admin Login
-                </button>
-              </div>
-            )}
-
-            <p>
-              {isSignup ? (
-                <>
-                  Already have an account?{" "}
-                  <button
-                    type="button"
-                    className="switch-link"
-                    onClick={() => setMode("login")}
-                  >
-                    Log in
-                  </button>
-                </>
-              ) : (
-                <>
-                  {loginRole === "ADMIN"
-                    ? "Sign in with your administrator account."
-                    : "Don't have an account? "}
-                  {loginRole === "USER" && (
                     <button
                       type="button"
-                      className="switch-link"
-                      onClick={() => setMode("signup")}
+                      className={loginRole === "USER" ? "active" : ""}
+                      onClick={() => setLoginRole("USER")}
                     >
-                      Sign up
+                      User Login
                     </button>
+
+                    <button
+                      type="button"
+                      className={loginRole === "ADMIN" ? "active" : ""}
+                      onClick={() => setLoginRole("ADMIN")}
+                    >
+                      Admin Login
+                    </button>
+
+                  </div>
+                )}
+
+                <p>
+                  {isSignup ? (
+                    <>
+                      Already have an account?{" "}
+                      <button
+                        type="button"
+                        className="switch-link"
+                        onClick={() => setMode("login")}
+                      >
+                        Log in
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      {loginRole === "ADMIN"
+                        ? "Sign in with your administrator account."
+                        : "Don't have an account? "}
+
+                      {loginRole === "USER" && (
+                        <button
+                          type="button"
+                          className="switch-link"
+                          onClick={() => setMode("signup")}
+                        >
+                          Sign up
+                        </button>
+                      )}
+                    </>
                   )}
-                </>
-              )}
-            </p>
+                </p>
+              </>
+            )}
+
           </div>
 
-          {isSignup ? (
+          {showForgotPassword ? (
+            <ForgotPasswordForm onBack={goToLogin} />
+          ) : isSignup ? (
             <SignupForm onSuccess={() => setMode("login")} />
           ) : (
             <LoginForm
               role={loginRole}
               onSuccess={onLoginSuccess}
+              onForgotPassword={() =>
+                setShowForgotPassword(true)
+              }
             />
           )}
 
-          {loginRole === "USER" && !isSignup && (
-            <>
-              <div className="divider">
-                <span />
-                <p>or</p>
-                <span />
-              </div>
+          {!showForgotPassword &&
+            loginRole === "USER" &&
+            !isSignup && (
+              <>
+                <div className="divider">
+                  <span />
+                  <p>or</p>
+                  <span />
+                </div>
 
-              <div className="social-row">
-                <button type="button" className="social-button">
-                  <GoogleIcon />
-                  <span>Continue with Google</span>
-                </button>
+                <div className="social-row">
 
-                <button type="button" className="social-button">
-                  <FacebookIcon />
-                  <span>Continue with Facebook</span>
-                </button>
-              </div>
-            </>
-          )}
+                  <button
+                    type="button"
+                    className="social-button"
+                  >
+                    <GoogleIcon />
+                    <span>Continue with Google</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="social-button"
+                  >
+                    <FacebookIcon />
+                    <span>Continue with Facebook</span>
+                  </button>
+
+                </div>
+              </>
+            )}
+
         </div>
       </section>
     </main>

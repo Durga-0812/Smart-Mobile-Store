@@ -127,3 +127,22 @@ class OrderResponse(BaseModel):
 
 class OrderStatusUpdate(BaseModel):
     status: str
+
+
+class MessageCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    email: EmailStr
+    subject: str = Field(min_length=2, max_length=200)
+    message: str = Field(min_length=5, max_length=2000)
+
+
+class MessageResponse(BaseModel):
+    id: str
+    name: str
+    email: str
+    subject: str
+    message: str
+    is_read: bool
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

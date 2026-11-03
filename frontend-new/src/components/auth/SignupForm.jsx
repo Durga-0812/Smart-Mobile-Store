@@ -50,7 +50,7 @@ export default function SignupForm({ onSuccess }) {
 
       
 const response = await fetch(
-  "https://smart-mobile-store.onrender.com/api/v1/auth/signup",
+  "http://127.0.0.1:8000/api/v1/auth/signup",
   {
 
 

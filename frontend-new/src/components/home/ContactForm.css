@@ -1,0 +1,143 @@
+.contact-section {
+padding: 65px 20px;
+background: var(--page-bg);
+color: var(--text-primary);
+}
+
+.contact-container {
+max-width: 850px;
+margin: 0 auto;
+}
+
+.contact-heading {
+text-align: center;
+margin-bottom: 32px;
+}
+
+.contact-heading span {
+color: #8b5cf6;
+font-size: 12px;
+font-weight: 700;
+letter-spacing: 2px;
+}
+
+.contact-heading h2 {
+margin: 10px 0;
+font-size: 32px;
+font-weight: 750;
+}
+
+.contact-heading p {
+color: var(--text-secondary);
+font-size: 15px;
+line-height: 1.6;
+}
+
+.contact-form {
+padding: 32px;
+border: 1px solid var(--border-color, #ddd);
+border-radius: 16px;
+background: var(--card-bg, #fff);
+box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+}
+
+.contact-form-row {
+display: grid;
+grid-template-columns: 1fr 1fr;
+gap: 20px;
+}
+
+.contact-field {
+display: flex;
+flex-direction: column;
+gap: 8px;
+margin-bottom: 20px;
+}
+
+.contact-field label {
+font-size: 14px;
+font-weight: 600;
+}
+
+.contact-field input,
+.contact-field textarea {
+width: 100%;
+padding: 13px 14px;
+border: 1px solid var(--border-color, #d1d5db);
+border-radius: 9px;
+background: var(--page-bg, #fff);
+color: var(--text-primary, #222);
+font: inherit;
+font-size: 14px;
+outline: none;
+box-sizing: border-box;
+transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.contact-field input:focus,
+.contact-field textarea:focus {
+border-color: #8b5cf6;
+box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.12);
+}
+
+.contact-field textarea {
+resize: vertical;
+}
+
+.contact-submit {
+width: 100%;
+padding: 14px;
+border: none;
+border-radius: 9px;
+background: linear-gradient(135deg, #7c3aed, #a855f7);
+color: white;
+font-size: 15px;
+font-weight: 700;
+cursor: pointer;
+transition: opacity 0.2s, transform 0.2s;
+}
+
+.contact-submit:hover {
+transform: translateY(-2px);
+}
+
+.contact-submit:disabled {
+opacity: 0.6;
+cursor: not-allowed;
+transform: none;
+}
+
+.contact-success {
+padding: 12px;
+border-radius: 8px;
+background: #dcfce7;
+color: #166534;
+font-size: 14px;
+}
+
+.contact-error {
+padding: 12px;
+border-radius: 8px;
+background: #fee2e2;
+color: #991b1b;
+font-size: 14px;
+}
+
+@media (max-width: 600px) {
+.contact-section {
+padding: 45px 16px;
+}
+
+.contact-form {
+padding: 22px 18px;
+}
+
+.contact-form-row {
+grid-template-columns: 1fr;
+gap: 0;
+}
+
+.contact-heading h2 {
+font-size: 27px;
+}
+}

@@ -1,9 +1,8 @@
-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import CartItem, Product
+from app.models import CartItem, Product, OrderItem
 from app.schemas import ProductCreate, ProductUpdate, ProductResponse
 from app.security import require_admin
 
@@ -83,4 +82,50 @@ def update_product(
     changes = data.model_dump(exclude_unset=True)
 
     for field, value in changes.items():
-        seta
+        setattr(product, field, value)
+
+    db.commit()
+    db.refresh(product)
+
+    return product
+
+
+# DELETE: Delete a product (admin only)
+@router.delete("/{product_id}")
+def delete_product(
+    product_id: str,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin)
+):
+    product = db.query(Product).filter(
+        Product.id == product_id
+    ).first()
+
+    if product is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Product not found"
+        )
+
+    # Protect existing order history
+    existing_order = db.query(OrderItem).filter(
+        OrderItem.product_id == product_id
+    ).first()
+
+    if existing_order:
+        raise HTTPException(
+            status_code=409,
+            detail="This product is linked to an existing order and cannot be deleted."
+        )
+
+    # Remove cart references before deleting the product
+    db.query(CartItem).filter(
+        CartItem.product_id == product_id
+    ).delete(synchronize_session=False)
+
+    db.delete(product)
+    db.commit()
+
+    return {
+        "message": "Product deleted successfully"
+    }
