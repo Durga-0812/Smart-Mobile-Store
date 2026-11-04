@@ -13,7 +13,7 @@ icon,
 return ( <div className="input-field">
 {label && <label htmlFor={name}>{label}</label>}
 
-```
+
   <div className="input-field-wrapper">
     {icon && <span className="input-field-icon">{icon}</span>}
 

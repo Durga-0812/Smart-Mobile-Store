@@ -30,7 +30,7 @@ onLoginClick?.();
 return;
 }
 
-```
+
 if (hasStockInfo && stock <= 0) {
   return;
 }
@@ -41,14 +41,14 @@ try {
 } catch (error) {
   alert(error.message || "Unable to add product to cart.");
 }
-```
+
 
 };
 
 return ( <section className="product-details"> <button type="button" onClick={onBack}>
 ← Back to Products </button>
 
-```
+
   <div className="product-details-content">
     <div className="product-details-image">
       {image ? (

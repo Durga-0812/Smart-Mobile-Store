@@ -28,7 +28,7 @@ if (onSearch) onSearch(searchQuery);
 return ( <nav className="home-nav"> <div className="home-logo"> <a href="#home">
 Tech <span>Lite</span> </a> </div>
 
-```
+
   <form
     className="home-search"
     onSubmit={(e) => {

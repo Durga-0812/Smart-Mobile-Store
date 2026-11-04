@@ -13,3 +13,6 @@ psycopg[binary]
 openai>=1.0.0
 
 razorpay==2.0.1
+
+Pillow
+pypdf
