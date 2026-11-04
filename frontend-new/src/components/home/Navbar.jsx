@@ -4,152 +4,153 @@ import { CartIcon, MoonIcon, SunIcon, UserIcon } from "../common/Icons";
 import "./Navbar.css";
 
 export default function Navbar({
-  isAuthenticated,
-  fullName,
-  onLoginClick,
-  onSignupClick,
-  onLogout,
-  onHomeClick,
-  onMyOrdersClick,
-  searchQuery,
-  setSearchQuery,
-  onSearch,
-  theme,
-  onThemeToggle,
+isAuthenticated,
+fullName,
+onLoginClick,
+onSignupClick,
+onLogout,
+onHomeClick,
+onMyOrdersClick,
+searchQuery,
+setSearchQuery,
+onSearch,
+theme,
+onThemeToggle,
 }) {
-  const { totalItems, setIsCartOpen } = useCart();
-  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+const { totalItems, setIsCartOpen } = useCart();
+const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
 
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    if (onSearch) onSearch(searchQuery);
-  };
+const handleSearchSubmit = (e) => {
+e.preventDefault();
+if (onSearch) onSearch(searchQuery);
+};
 
-  return (
-    <nav className="home-nav">
-      <div className="home-logo">
-        <a href="#home">
-          Tech <span>Lite</span>
-        </a>
-      </div>
+return ( <nav className="home-nav"> <div className="home-logo"> <a href="#home">
+Tech <span>Lite</span> </a> </div>
 
-      ```jsx
-<form
-  className="home-search"
-  onSubmit={(e) => {
-    handleSearchSubmit(e);
-    document.getElementById("mobiles")?.scrollIntoView({
-      behavior: "smooth",
-    });
-  }}
->
-  <input
-    type="text"
-    placeholder="Search mobiles, laptops, accessories..."
-    value={searchQuery || ""}
-    onChange={(e) => setSearchQuery && setSearchQuery(e.target.value)}
-    onFocus={() => {
+```
+  <form
+    className="home-search"
+    onSubmit={(e) => {
+      handleSearchSubmit(e);
       document.getElementById("mobiles")?.scrollIntoView({
         behavior: "smooth",
       });
     }}
-    aria-label="Search products"
-  />
-  <button type="submit">Search</button>
-</form>
+  >
+    <input
+      type="text"
+      placeholder="Search mobiles, laptops, accessories..."
+      value={searchQuery || ""}
+      onChange={(e) => setSearchQuery && setSearchQuery(e.target.value)}
+      onFocus={() => {
+        document.getElementById("mobiles")?.scrollIntoView({
+          behavior: "smooth",
+        });
+      }}
+      aria-label="Search products"
+    />
+    <button type="submit">Search</button>
+  </form>
 
+  <div className="home-menu">
+    <a href="#home" onClick={onHomeClick}>Home</a>
 
+    <button
+      type="button"
+      className="home-cart-btn"
+      onClick={() => setIsCartOpen(true)}
+      aria-label={
+        isAuthenticated
+          ? `Open Your bag${totalItems ? `, ${totalItems} items` : ""}`
+          : "Open your bag to log in or create an account"
+      }
+    >
+      <CartIcon size={18} />
+      <span>Your bag</span>
+      {isAuthenticated && totalItems > 0 && (
+        <span className="cart-nav-badge">{totalItems}</span>
+      )}
+    </button>
 
-      <div className="home-menu">
-        <a href="#home" onClick={onHomeClick}>Home</a>
+    <button
+      type="button"
+      className="theme-toggle"
+      onClick={onThemeToggle}
+      aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
+      title={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
+    >
+      {theme === "light" ? <MoonIcon /> : <SunIcon />}
+    </button>
 
-        <button
-          type="button"
-          className="home-cart-btn"
-          onClick={() => setIsCartOpen(true)}
-          aria-label={
-            isAuthenticated
-              ? `Open Your bag${totalItems ? `, ${totalItems} items` : ""}`
-              : "Open your bag to log in or create an account"
-          }
-        >
-          <CartIcon size={18} />
-          <span>Your bag</span>
-          {isAuthenticated && totalItems > 0 && (
-            <span className="cart-nav-badge">{totalItems}</span>
-          )}
-        </button>
+    <div className="home-auth-buttons">
+      {isAuthenticated ? (
+        <div className="profile-menu-wrap">
+          <button
+            type="button"
+            className="profile-button"
+            onClick={() => setIsAccountMenuOpen(!isAccountMenuOpen)}
+            aria-expanded={isAccountMenuOpen}
+            aria-haspopup="menu"
+          >
+            <UserIcon />
+            <span>{fullName ? fullName.split(" ")[0] : "My account"}</span>
+          </button>
 
-        <button
-          type="button"
-          className="theme-toggle"
-          onClick={onThemeToggle}
-          aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
-          title={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
-        >
-          {theme === "light" ? <MoonIcon /> : <SunIcon />}
-        </button>
+          {isAccountMenuOpen && (
+            <div className="profile-menu" role="menu">
+              <span className="profile-menu-name">
+                {fullName || "TechLite member"}
+              </span>
 
-        <div className="home-auth-buttons">
-          {isAuthenticated ? (
-            <div className="profile-menu-wrap">
               <button
                 type="button"
-                className="profile-button"
-                onClick={() => setIsAccountMenuOpen(!isAccountMenuOpen)}
-                aria-expanded={isAccountMenuOpen}
-                aria-haspopup="menu"
+                role="menuitem"
+                onClick={() => {
+                  setIsAccountMenuOpen(false);
+                  onMyOrdersClick?.();
+                }}
               >
-                <UserIcon />
-                <span>{fullName ? fullName.split(" ")[0] : "My account"}</span>
+                My orders
               </button>
-              {isAccountMenuOpen && (
-                <div className="profile-menu" role="menu">
-                  <span className="profile-menu-name">{fullName || "TechLite member"}</span>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setIsAccountMenuOpen(false);
-                      onMyOrdersClick?.();
-                    }}
-                  >
-                    My orders
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setIsAccountMenuOpen(false);
-                      onLogout?.();
-                    }}
-                  >
-                    Sign out
-                  </button>
-                </div>
-              )}
+
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setIsAccountMenuOpen(false);
+                  onLogout?.();
+                }}
+              >
+                Sign out
+              </button>
             </div>
-          ) : (
-            <>
-              <button
-                type="button"
-                className="profile-button"
-                onClick={onLoginClick}
-              >
-                <UserIcon />
-                <span>Login</span>
-              </button>
-              <button
-                type="button"
-                className="home-signup"
-                onClick={onSignupClick}
-              >
-                Create account
-              </button>
-            </>
           )}
         </div>
-      </div>
-    </nav>
-  );
+      ) : (
+        <>
+          <button
+            type="button"
+            className="profile-button"
+            onClick={onLoginClick}
+          >
+            <UserIcon />
+            <span>Login</span>
+          </button>
+
+          <button
+            type="button"
+            className="home-signup"
+            onClick={onSignupClick}
+          >
+            Create account
+          </button>
+        </>
+      )}
+    </div>
+  </div>
+</nav>
+
+
+);
 }
