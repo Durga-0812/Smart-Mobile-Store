@@ -1,12 +1,12 @@
-
 import { useMemo, useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import { useCart } from "../../hooks/useCart";
 import "./CartModal.css";
 
 const FREE_SHIPPING_LIMIT = 2000;
 const SHIPPING_CHARGE = 99;
 const TAX_RATE = 0.1;
-const API_URL = "http://127.0.0.1:8000/api/v1";
+const API_URL = "/api/v1";
 
 export default function CartModal({
   isOpen,
@@ -30,6 +30,8 @@ export default function CartModal({
   const [messageType, setMessageType] = useState("info");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(null);
+  const [paymentStep, setPaymentStep] = useState(false);
+  const [demoReference, setDemoReference] = useState("");
   const [orderIdCopied, setOrderIdCopied] = useState(false);
   const [copyError, setCopyError] = useState("");
 
@@ -78,7 +80,7 @@ export default function CartModal({
       setCopyError("");
       window.setTimeout(() => setOrderIdCopied(false), 1800);
     } catch {
-      setCopyError("Could not copy the order ID. Please select and copy it.");
+      setCopyError("Could not copy the order ID.");
     }
   };
 
@@ -96,7 +98,7 @@ export default function CartModal({
       await updateQuantity(item.id, change);
       showMessage("");
     } catch (error) {
-      showMessage(error.message || "Unable to update item quantity.", "error");
+      showMessage(error.message || "Unable to update quantity.", "error");
     }
   };
 
@@ -109,7 +111,7 @@ export default function CartModal({
     try {
       await removeFromCart(item.id);
     } catch (error) {
-      showMessage(error.message || "Unable to remove this product.", "error");
+      showMessage(error.message || "Unable to remove product.", "error");
       return;
     }
 
@@ -124,15 +126,11 @@ export default function CartModal({
     const code = coupon.trim().toUpperCase();
 
     if (!code) {
-      setAppliedCoupon("");
-      setDiscount(0);
       showMessage("Please enter a coupon code.", "error");
       return;
     }
 
     if (cartItems.length === 0 || subtotal <= 0) {
-      setAppliedCoupon("");
-      setDiscount(0);
       showMessage("Add products before applying a coupon.", "error");
       return;
     }
@@ -155,7 +153,6 @@ export default function CartModal({
       if (subtotal < 2000) {
         setAppliedCoupon("");
         setDiscount(0);
-
         showMessage(
           "SAVE200 requires a subtotal of at least ₹2,000.",
           "error"
@@ -166,7 +163,6 @@ export default function CartModal({
       setCoupon(code);
       setAppliedCoupon(code);
       setDiscount(200);
-
       showMessage("Coupon applied! You saved ₹200.", "success");
       return;
     }
@@ -185,22 +181,41 @@ export default function CartModal({
     try {
       await clearCart();
     } catch (error) {
-      showMessage(error.message || "Unable to clear your cart.", "error");
+      showMessage(error.message || "Unable to clear cart.", "error");
       return;
     }
+
     setCoupon("");
     setAppliedCoupon("");
     setDiscount(0);
-
     showMessage("Your cart has been cleared.", "success");
   };
 
-  const handleCheckout = async () => {
+  // Open the demo payment screen.
+  const handleCheckout = () => {
     if (cartItems.length === 0) {
       showMessage("Your cart is empty.", "error");
       return;
     }
 
+    const token = localStorage.getItem("access_token");
+
+    if (!token) {
+      showMessage("Please log in before checkout.", "error");
+      return;
+    }
+
+    const reference =
+      globalThis.crypto?.randomUUID?.() ||
+      `TL-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    setDemoReference(reference);
+    setPaymentStep(true);
+    showMessage("");
+  };
+
+  // This is a DEMO action, not a real payment confirmation.
+  const handleDemoPayment = async () => {
     const token = localStorage.getItem("access_token");
 
     if (!token) {
@@ -236,22 +251,23 @@ export default function CartModal({
           ? detail.map((error) => error.msg).join(", ")
           : typeof detail === "string"
             ? detail
-            : "Checkout failed. Please try again.";
+            : "Order creation failed. Please try again.";
 
         throw new Error(errorMessage);
       }
 
       setOrderSuccess(data);
+      setPaymentStep(false);
       clearLocalCart();
 
       setCoupon("");
       setAppliedCoupon("");
       setDiscount(0);
 
-      showMessage("Order placed successfully!", "success");
+      showMessage("Demo order created successfully!", "success");
     } catch (error) {
       showMessage(
-        error.message || "Unable to place your order.",
+        error.message || "Unable to create order.",
         "error"
       );
     } finally {
@@ -272,7 +288,14 @@ export default function CartModal({
       >
         <header className="cart-header">
           <div className="cart-header-title">
-            <h2>{orderSuccess ? "Order Receipt" : "Your Cart"}</h2>
+            <h2>
+              {orderSuccess
+                ? "Order Receipt"
+                : paymentStep
+                  ? "Scan & Pay"
+                  : "Your Cart"}
+            </h2>
+
             <span className="cart-badge-count">
               {orderSuccess ? 0 : itemCount}
             </span>
@@ -289,48 +312,62 @@ export default function CartModal({
         </header>
 
         <div className="cart-content">
+
+          {/* ORDER RECEIPT */}
           {orderSuccess ? (
             <div className="cart-empty cart-receipt-view">
-              <section className="cart-receipt" aria-label="Order receipt">
+              <section className="cart-receipt">
                 <div className="cart-receipt-brand">TechLite</div>
+
                 <h3>Order placed successfully!</h3>
+
                 <p className="cart-receipt-thanks">
                   Thank you for shopping with TechLite.
                 </p>
+
+                <div className="cart-demo-payment-label">
+                  DEMO PAYMENT — NOT A REAL TRANSACTION
+                </div>
 
                 <dl className="cart-receipt-meta">
                   <div>
                     <dt>Order ID</dt>
                     <dd className="cart-receipt-order-id">
                       <code>{orderSuccess.id}</code>
+
                       <button
                         type="button"
                         className="cart-copy-order-id"
                         onClick={handleCopyOrderId}
-                        aria-label="Copy order ID"
                       >
                         {orderIdCopied ? "Copied" : "Copy"}
                       </button>
                     </dd>
                   </div>
+
                   <div>
                     <dt>Order date</dt>
                     <dd>
-                      {new Date(orderSuccess.created_at).toLocaleString("en-IN")}
+                      {new Date(
+                        orderSuccess.created_at
+                      ).toLocaleString("en-IN")}
                     </dd>
                   </div>
+
                   <div>
                     <dt>Status</dt>
                     <dd>{orderSuccess.status}</dd>
                   </div>
                 </dl>
+
                 {copyError && (
-                  <p className="cart-receipt-copy-error" role="alert">
+                  <p className="cart-receipt-copy-error">
                     {copyError}
                   </p>
                 )}
+
                 <p className="cart-receipt-status-note">
-                  Your order is placed and awaiting processing.
+                  Your demo order has been created and is awaiting processing.
                 </p>
 
                 <div className="cart-receipt-items">
@@ -339,12 +376,16 @@ export default function CartModal({
                     <span>Qty</span>
                     <span>Amount</span>
                   </div>
+
                   {(orderSuccess.items ?? []).map((item) => (
                     <div className="cart-receipt-row" key={item.id}>
                       <span>
                         {item.product_name}
-                        <small>{formatPrice(item.unit_price)} each</small>
+                        <small>
+                          {formatPrice(item.unit_price)} each
+                        </small>
                       </span>
+
                       <span>{item.quantity}</span>
                       <span>{formatPrice(item.line_total)}</span>
                     </div>
@@ -356,20 +397,26 @@ export default function CartModal({
                     <span>Subtotal</span>
                     <span>{formatPrice(orderSuccess.subtotal)}</span>
                   </div>
+
                   {Number(orderSuccess.discount) > 0 && (
                     <div>
                       <span>Discount</span>
-                      <span>-{formatPrice(orderSuccess.discount)}</span>
+                      <span>
+                        -{formatPrice(orderSuccess.discount)}
+                      </span>
                     </div>
                   )}
+
                   <div>
                     <span>Tax</span>
                     <span>{formatPrice(orderSuccess.tax)}</span>
                   </div>
+
                   <div>
                     <span>Shipping</span>
                     <span>{formatPrice(orderSuccess.shipping)}</span>
                   </div>
+
                   <div className="cart-receipt-total">
                     <strong>Order total</strong>
                     <strong>{formatPrice(orderSuccess.total)}</strong>
@@ -385,6 +432,7 @@ export default function CartModal({
                 >
                   Print Bill
                 </button>
+
                 <button
                   type="button"
                   className="cart-browse-btn"
@@ -398,14 +446,108 @@ export default function CartModal({
                 </button>
               </div>
             </div>
+
+          ) : paymentStep ? (
+
+            /* DEMO SCAN AND PAY SCREEN */
+            <div className="cart-payment-screen">
+
+              <button
+                type="button"
+                className="cart-payment-back"
+                onClick={() => {
+                  setPaymentStep(false);
+                  showMessage("");
+                }}
+              >
+                ← Back to Cart
+              </button>
+
+              <div className="cart-payment-brand">
+                <span>TechLite</span>
+                <span className="cart-payment-secure">DEMO CHECKOUT</span>
+              </div>
+
+              <h3>Scan & Pay</h3>
+
+              <p className="cart-payment-description">
+                Scan this demonstration QR code to preview the payment
+                experience.
+              </p>
+
+              <div className="cart-payment-amount">
+                <small>Total Amount</small>
+                <strong>{formatPrice(total)}</strong>
+              </div>
+
+              <div className="cart-demo-qr-container">
+                <QRCodeSVG
+                  value={JSON.stringify({
+                    type: "TECHLITE_DEMO_PAYMENT",
+                    reference: demoReference,
+                    amount: Number(total.toFixed(2)),
+                    currency: "INR",
+                  })}
+                  size={210}
+                  level="H"
+                  includeMargin
+                />
+              </div>
+
+              <div className="cart-demo-qr-warning">
+                DEMO QR CODE — NOT A REAL UPI PAYMENT QR
+              </div>
+
+              <p className="cart-payment-instruction">
+                This QR is for project demonstration only.
+                Scanning it will not transfer money.
+              </p>
+
+              <div className="cart-payment-apps">
+                <span className="cart-payment-app gpay">G Pay</span>
+                <span className="cart-payment-app phonepe">PhonePe</span>
+                <span className="cart-payment-app paytm">Paytm</span>
+              </div>
+
+              <div className="cart-payment-reference">
+                Reference: {demoReference}
+              </div>
+
+              {message && (
+                <p
+                  className={`cart-message cart-message-${messageType}`}
+                  role="status"
+                >
+                  {message}
+                </p>
+              )}
+
+              <button
+                type="button"
+                className="cart-demo-success-btn"
+                onClick={handleDemoPayment}
+                disabled={checkoutLoading}
+              >
+                {checkoutLoading
+                  ? "Creating Demo Order..."
+                  : "✓ Simulate Payment Success"}
+              </button>
+
+              <p className="cart-demo-disclaimer">
+                For demonstration only. No payment is collected or verified.
+              </p>
+            </div>
+
           ) : !isAuthenticated ? (
+
             <div className="cart-empty cart-auth-required">
               <div className="cart-empty-icon">🔐</div>
               <h3>Sign in to manage your cart</h3>
+
               <p>
-                Log in or create an account to add, update, or remove products
-                from your cart.
+                Log in or create an account to manage your products.
               </p>
+
               <div className="cart-auth-actions">
                 <button
                   type="button"
@@ -414,6 +556,7 @@ export default function CartModal({
                 >
                   Login
                 </button>
+
                 <button
                   type="button"
                   className="cart-auth-signup-btn"
@@ -423,7 +566,9 @@ export default function CartModal({
                 </button>
               </div>
             </div>
+
           ) : cartItems.length === 0 ? (
+
             <div className="cart-empty">
               <div className="cart-empty-icon">🛒</div>
               <h3>Your cart is empty</h3>
@@ -437,12 +582,15 @@ export default function CartModal({
                 Continue Shopping
               </button>
             </div>
+
           ) : (
+
             <div className="cart-items-list">
               {cartItems.map((item) => {
                 const price = Number(
                   item.priceNum ?? item.price ?? 0
                 );
+
                 const quantity = Number(item.quantity ?? 1);
 
                 return (
@@ -476,7 +624,6 @@ export default function CartModal({
                           className="cart-item-delete"
                           onClick={() => handleRemove(item)}
                           aria-label={`Remove ${item.name}`}
-                          title="Remove item"
                         >
                           ×
                         </button>
@@ -486,11 +633,8 @@ export default function CartModal({
                         <div className="cart-qty-selector">
                           <button
                             type="button"
-                            onClick={() =>
-                              handleQuantity(item, -1)
-                            }
+                            onClick={() => handleQuantity(item, -1)}
                             disabled={quantity <= 1}
-                            aria-label={`Decrease ${item.name} quantity`}
                           >
                             −
                           </button>
@@ -499,10 +643,7 @@ export default function CartModal({
 
                           <button
                             type="button"
-                            onClick={() =>
-                              handleQuantity(item, 1)
-                            }
-                            aria-label={`Increase ${item.name} quantity`}
+                            onClick={() => handleQuantity(item, 1)}
                           >
                             +
                           </button>
@@ -520,109 +661,106 @@ export default function CartModal({
           )}
         </div>
 
-        {!orderSuccess && isAuthenticated && cartItems.length > 0 && (
-          <footer className="cart-footer">
-            <div className="cart-coupon">
-              <label htmlFor="cart-coupon-input">
-                Coupon code
-              </label>
+        {/* CART FOOTER */}
+        {!orderSuccess &&
+          !paymentStep &&
+          isAuthenticated &&
+          cartItems.length > 0 && (
+            <footer className="cart-footer">
+              <div className="cart-coupon">
+                <label htmlFor="cart-coupon-input">
+                  Coupon code
+                </label>
 
-              <div className="cart-coupon-controls">
-                <input
-                  id="cart-coupon-input"
-                  type="text"
-                  value={coupon}
-                  onChange={(event) =>
-                    setCoupon(event.target.value)
-                  }
-                  placeholder="Enter coupon code"
-                  autoComplete="off"
-                />
+                <div className="cart-coupon-controls">
+                  <input
+                    id="cart-coupon-input"
+                    type="text"
+                    value={coupon}
+                    onChange={(event) =>
+                      setCoupon(event.target.value)
+                    }
+                    placeholder="Enter coupon code"
+                    autoComplete="off"
+                  />
 
-                <button
-                  type="button"
-                  onClick={handleApplyCoupon}
-                >
-                  Apply
-                </button>
+                  <button
+                    type="button"
+                    onClick={handleApplyCoupon}
+                  >
+                    Apply
+                  </button>
+                </div>
+
+                <small>
+                  SAVE10: 10% off. SAVE200: ₹200 off on a
+                  subtotal of ₹2,000 or more.
+                </small>
               </div>
 
-              <small>
-                SAVE10: 10% off. SAVE200: ₹200 off on a
-                subtotal of ₹2,000 or more.
-              </small>
-            </div>
-
-            <div className="cart-summary-row">
-              <span>Subtotal</span>
-              <span>{formatPrice(subtotal)}</span>
-            </div>
-
-            {discount > 0 && (
               <div className="cart-summary-row">
-                <span>Discount ({appliedCoupon})</span>
-                <span>-{formatPrice(discount)}</span>
+                <span>Subtotal</span>
+                <span>{formatPrice(subtotal)}</span>
               </div>
-            )}
 
-            <div className="cart-summary-row">
-              <span>Tax (10%)</span>
-              <span>{formatPrice(tax)}</span>
-            </div>
+              {discount > 0 && (
+                <div className="cart-summary-row">
+                  <span>Discount ({appliedCoupon})</span>
+                  <span>-{formatPrice(discount)}</span>
+                </div>
+              )}
 
-            <div className="cart-summary-row">
-              <span>Shipping</span>
-              <span>
-                {shipping === 0
-                  ? "FREE"
-                  : formatPrice(shipping)}
-              </span>
-            </div>
+              <div className="cart-summary-row">
+                <span>Tax (10%)</span>
+                <span>{formatPrice(tax)}</span>
+              </div>
 
-            <div className="cart-free-shipping">
-              {subtotal >= FREE_SHIPPING_LIMIT
-                ? "You've unlocked free shipping!"
-                : `Add ${formatPrice(
-                    FREE_SHIPPING_LIMIT - subtotal
-                  )} more for free shipping.`}
-            </div>
+              <div className="cart-summary-row">
+                <span>Shipping</span>
+                <span>
+                  {shipping === 0 ? "FREE" : formatPrice(shipping)}
+                </span>
+              </div>
 
-            <div className="cart-total-row">
-              <span>Total</span>
-              <strong>{formatPrice(total)}</strong>
-            </div>
+              <div className="cart-free-shipping">
+                {subtotal >= FREE_SHIPPING_LIMIT
+                  ? "You've unlocked free shipping!"
+                  : `Add ${formatPrice(
+                      FREE_SHIPPING_LIMIT - subtotal
+                    )} more for free shipping.`}
+              </div>
 
-            {message && (
-              <p
-                className={`cart-message cart-message-${messageType}`}
-                role="status"
-                aria-live="polite"
+              <div className="cart-total-row">
+                <span>Total</span>
+                <strong>{formatPrice(total)}</strong>
+              </div>
+
+              {message && (
+                <p
+                  className={`cart-message cart-message-${messageType}`}
+                  role="status"
+                >
+                  {message}
+                </p>
+              )}
+
+              <button
+                type="button"
+                className="cart-checkout-btn"
+                onClick={handleCheckout}
               >
-                {message}
-              </p>
-            )}
+                Proceed to Checkout
+              </button>
 
-            <button
-              type="button"
-              className="cart-checkout-btn"
-              onClick={handleCheckout}
-              disabled={checkoutLoading}
-            >
-              {checkoutLoading
-                ? "Placing Order..."
-                : "Proceed to Checkout"}
-            </button>
-
-            <button
-              type="button"
-              className="cart-clear-btn"
-              onClick={handleClearCart}
-              disabled={checkoutLoading}
-            >
-              Clear Cart
-            </button>
-          </footer>
-        )}
+              <button
+                type="button"
+                className="cart-clear-btn"
+                onClick={handleClearCart}
+              >
+                Clear Cart
+              </button>
+            </footer>
+          )}
       </aside>
     </div>
   );

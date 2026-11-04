@@ -1,3 +1,4 @@
+import Chatbot from "./components/chatbot/Chatbot";
 import React, { useState } from "react";
 import HomePage from "./pages/HomePage";
 import AuthPage from "./components/auth/AuthPage";
@@ -91,6 +92,7 @@ export default function App() {
             onAdminLoginClick={handleAdminLoginClick}
             onLogout={handleLogout}
           />
+                    <Chatbot />
           {showAuth && (
             <AuthPage
               mode={mode}

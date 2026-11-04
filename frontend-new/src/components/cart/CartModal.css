@@ -1616,3 +1616,199 @@
   background: linear-gradient(105deg, #2c8170, #3e9a86);
   color: #fff;
 }
+/* ===== TECHLITE DEMO SCAN & PAY ===== */
+
+.cart-payment-screen {
+  width: 100%;
+  padding: 20px 18px 28px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  text-align: center;
+}
+
+.cart-payment-back {
+  display: block;
+  margin-bottom: 22px;
+  padding: 8px 12px;
+  border: 1px solid #dce8e1;
+  border-radius: 8px;
+  background: white;
+  color: #287567;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.cart-payment-brand {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 22px;
+  color: #287567;
+  font-size: 19px;
+  font-weight: 800;
+}
+
+.cart-payment-secure {
+  padding: 6px 9px;
+  border-radius: 20px;
+  background: #e8f4ec;
+  color: #28734e;
+  font-size: 10px;
+  letter-spacing: 1px;
+}
+
+.cart-payment-screen h3 {
+  margin: 8px 0;
+  color: #1b302a;
+  font-size: 24px;
+}
+
+.cart-payment-description {
+  color: #718078;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.cart-payment-amount {
+  display: grid;
+  gap: 5px;
+  margin: 22px 0;
+  padding: 17px;
+  border: 1px solid #dcece2;
+  border-radius: 12px;
+  background: #f1f8f3;
+}
+
+.cart-payment-amount small {
+  color: #718078;
+}
+
+.cart-payment-amount strong {
+  color: #236d5d;
+  font-size: 28px;
+}
+
+.cart-demo-qr-container {
+  display: inline-flex;
+  justify-content: center;
+  padding: 15px;
+  border: 1px solid #e4e7eb;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.07);
+}
+
+.cart-demo-qr-warning {
+  margin: 15px auto 8px;
+  padding: 9px;
+  border-radius: 7px;
+  background: #fff2df;
+  color: #985b00;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+}
+
+.cart-payment-instruction {
+  color: #718078;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.cart-payment-apps {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin: 20px 0;
+}
+
+.cart-payment-app {
+  padding: 9px 13px;
+  border: 1px solid #e2e8e5;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.gpay {
+  color: #4285f4;
+}
+
+.phonepe {
+  color: #5f259f;
+}
+
+.paytm {
+  color: #007bba;
+}
+
+.cart-payment-reference {
+  margin: 12px 0;
+  color: #8a968f;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
+.cart-demo-success-btn {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 16px;
+  border: none;
+  border-radius: 9px;
+  background: linear-gradient(105deg, #1d5d52, #2c8170);
+  color: white;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cart-demo-success-btn:hover {
+  background: linear-gradient(105deg, #184d44, #246f60);
+}
+
+.cart-demo-success-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.cart-demo-disclaimer {
+  margin-top: 13px;
+  color: #89958e;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.cart-demo-payment-label {
+  margin: 14px 0;
+  padding: 9px;
+  border-radius: 7px;
+  background: #fff2df;
+  color: #985b00;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+/* Dark mode */
+
+.home-page[data-theme="dark"] .cart-payment-screen h3 {
+  color: var(--text-primary);
+}
+
+.home-page[data-theme="dark"] .cart-payment-back,
+.home-page[data-theme="dark"] .cart-payment-app {
+  border-color: var(--border-subtle);
+  background: #202d29;
+  color: var(--text-primary);
+}
+
+.home-page[data-theme="dark"] .cart-payment-amount {
+  border-color: var(--border-subtle);
+  background: #20372d;
+}
+
+.home-page[data-theme="dark"] .cart-payment-description,
+.home-page[data-theme="dark"] .cart-payment-instruction {
+  color: var(--text-muted);
+}

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import "./ContactForm.css";
 
-const API_URL = "http://localhost:8000/api/v1/messages/";
+const API_URL = "/api/v1/messages/";
 
 export default function ContactForm() {
 const [formData, setFormData] = useState({

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 
 const API_URL =
-  "http://127.0.0.1:8000/api/v1/auth";
+  "/api/v1/auth";
 
 export default function ForgotPasswordForm({ onBack }) {
   const [email, setEmail] = useState("");

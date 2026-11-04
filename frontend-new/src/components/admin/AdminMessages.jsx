@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import "./AdminMessages.css";
 
-const API = "http://127.0.0.1:8000/api/v1/messages/";
+const API = "/api/v1/messages/";
 
 export default function AdminMessages() {
   const [messages, setMessages] = useState([]);
