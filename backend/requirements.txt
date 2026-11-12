@@ -17,3 +17,4 @@ razorpay==2.0.1
 
 Pillow
 pypdf
+python-multipart>=0.0.20
