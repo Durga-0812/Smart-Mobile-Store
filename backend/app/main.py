@@ -1,6 +1,7 @@
 ﻿from pathlib import Path
 
 from fastapi import FastAPI
+from sqlalchemy import inspect, text
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -10,6 +11,28 @@ from app import models
 from app.routers import auth, products, orders, cart, messages,chatbot
 
 Base.metadata.create_all(bind=engine)
+
+# Safely add delivery columns to existing orders table
+existing_columns = {
+    column["name"]
+    for column in inspect(engine).get_columns("orders")
+}
+
+delivery_columns = {
+    "delivery_address": "TEXT",
+    "delivery_latitude": "NUMERIC(10, 7)",
+    "delivery_longitude": "NUMERIC(10, 7)",
+}
+
+with engine.begin() as connection:
+    for column_name, column_type in delivery_columns.items():
+        if column_name not in existing_columns:
+            connection.execute(
+                text(
+                    f"ALTER TABLE orders ADD COLUMN "
+                    f"{column_name} {column_type}"
+                )
+            )
 
 app = FastAPI(
     title="Smart Mobile Store API",

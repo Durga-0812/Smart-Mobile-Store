@@ -1,4 +1,7 @@
-﻿from pydantic_settings import BaseSettings, SettingsConfigDict
+﻿from pathlib import Path
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 class Settings(BaseSettings):
@@ -13,9 +16,11 @@ class Settings(BaseSettings):
     SMTP_PORT: int = 465
     SMTP_EMAIL: str = ""
     SMTP_PASSWORD: str = ""
+    GOOGLE_CLIENT_ID: str = ""
+    RECAPTCHA_SECRET_KEY: str = ""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=BASE_DIR / ".env",
         extra="ignore",
     )
 

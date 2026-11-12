@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { useCart } from "../../hooks/useCart";
+import DeliveryLocation from "../DeliveryLocation";
 import "./CartModal.css";
 
 const FREE_SHIPPING_LIMIT = 2000;
@@ -31,6 +32,8 @@ export default function CartModal({
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(null);
   const [paymentStep, setPaymentStep] = useState(false);
+  const [deliveryStep, setDeliveryStep] = useState(false);
+  const [deliveryLocation, setDeliveryLocation] = useState(null);
   const [demoReference, setDemoReference] = useState("");
   const [orderIdCopied, setOrderIdCopied] = useState(false);
   const [copyError, setCopyError] = useState("");
@@ -210,18 +213,24 @@ export default function CartModal({
       `TL-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     setDemoReference(reference);
-    setPaymentStep(true);
+    setDeliveryStep(true);
+    setPaymentStep(false);
     showMessage("");
   };
 
   // This is a DEMO action, not a real payment confirmation.
-  const handleDemoPayment = async () => {
-    const token = localStorage.getItem("access_token");
+const handleDemoPayment = async () => {
+  if (!deliveryLocation) {
+    showMessage("Please select a delivery location.", "error");
+    return;
+  }
 
-    if (!token) {
-      showMessage("Please log in before checkout.", "error");
-      return;
-    }
+  const token = localStorage.getItem("access_token");
+
+  if (!token) {
+    showMessage("Please log in before checkout.", "error");
+    return;
+  }
 
     try {
       setCheckoutLoading(true);
@@ -234,12 +243,15 @@ export default function CartModal({
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          items: cartItems.map((item) => ({
-            product_id: String(item.id),
-            quantity: Number(item.quantity ?? 1),
-          })),
-          coupon_code: appliedCoupon || null,
-        }),
+  items: cartItems.map((item) => ({
+    product_id: String(item.id),
+    quantity: Number(item.quantity ?? 1),
+  })),
+  coupon_code: appliedCoupon || null,
+  delivery_address: deliveryLocation?.address || null,
+  delivery_latitude: deliveryLocation?.latitude ?? null,
+  delivery_longitude: deliveryLocation?.longitude ?? null,
+}),
       });
 
       const data = await response.json().catch(() => ({}));
@@ -289,11 +301,13 @@ export default function CartModal({
         <header className="cart-header">
           <div className="cart-header-title">
             <h2>
-              {orderSuccess
-                ? "Order Receipt"
-                : paymentStep
-                  ? "Scan & Pay"
-                  : "Your Cart"}
+             {orderSuccess
+  ? "Order Receipt"
+  : deliveryStep
+    ? "Select Delivery Location"
+    : paymentStep
+      ? "Scan & Pay"
+      : "Your Cart"}
             </h2>
 
             <span className="cart-badge-count">
@@ -447,7 +461,41 @@ export default function CartModal({
               </div>
             </div>
 
-          ) : paymentStep ? (
+          ) : deliveryStep ? (
+
+  /* DELIVERY LOCATION SCREEN */
+  <div className="cart-payment-screen">
+    <button
+      type="button"
+      className="cart-payment-back"
+      onClick={() => setDeliveryStep(false)}
+    >
+      ← Back to Cart
+    </button>
+
+    <DeliveryLocation
+      onLocationSelect={(location) => setDeliveryLocation(location)}
+    />
+
+    {deliveryLocation && (
+      <div style={{ padding: "12px" }}>
+        <p>Delivery location selected successfully!</p>
+
+        <button
+          type="button"
+          className="cart-checkout-btn"
+          onClick={() => {
+            setDeliveryStep(false);
+            setPaymentStep(true);
+          }}
+        >
+          Continue to Payment
+        </button>
+      </div>
+    )}
+  </div>
+
+) : paymentStep ? (
 
             /* DEMO SCAN AND PAY SCREEN */
             <div className="cart-payment-screen">
@@ -663,9 +711,10 @@ export default function CartModal({
 
         {/* CART FOOTER */}
         {!orderSuccess &&
-          !paymentStep &&
-          isAuthenticated &&
-          cartItems.length > 0 && (
+  !deliveryStep &&
+  !paymentStep &&
+  isAuthenticated &&
+  cartItems.length > 0 && (
             <footer className="cart-footer">
               <div className="cart-coupon">
                 <label htmlFor="cart-coupon-input">

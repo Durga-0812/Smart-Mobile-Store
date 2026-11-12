@@ -6,14 +6,13 @@ from app.config import settings
 
 DATABASE_URL = settings.DATABASE_URL
 
-# Use Psycopg 3 for PostgreSQL connections.
+# Convert PostgreSQL URLs to use Psycopg 3.
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace(
         "postgres://",
         "postgresql+psycopg://",
         1
     )
-
 elif DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace(
         "postgresql://",
@@ -21,6 +20,7 @@ elif DATABASE_URL.startswith("postgresql://"):
         1
     )
 
+# SQLite requires a special connection argument.
 connect_args = (
     {"check_same_thread": False}
     if DATABASE_URL.startswith("sqlite")
@@ -44,7 +44,6 @@ Base = declarative_base()
 
 def get_db():
     db = SessionLocal()
-
     try:
         yield db
     finally:

@@ -1,12 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import LoginForm from "./LoginForm";
 import SignupForm from "./SignupForm";
 import ForgotPasswordForm from "./ForgotPasswordForm";
 
 import {
   BackArrowIcon,
-  GoogleIcon,
-  FacebookIcon,
   LogoMark,
 } from "../common/Icons";
 
@@ -23,7 +21,126 @@ export default function AuthPage({
   const [showForgotPassword, setShowForgotPassword] =
     useState(false);
 
+  const [googleReady, setGoogleReady] = useState(false);
+  const [googleError, setGoogleError] = useState("");
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  const googleButtonRef = useRef(null);
+
   const isSignup = mode === "signup";
+
+  // Load Google authentication script
+  useEffect(() => {
+    if (window.google?.accounts?.id) {
+      setGoogleReady(true);
+      return;
+    }
+
+    const script = document.createElement("script");
+
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+
+    script.onload = () => setGoogleReady(true);
+
+    script.onerror = () => {
+      setGoogleError("Unable to load Google Sign-In.");
+    };
+
+    document.head.appendChild(script);
+  }, []);
+
+  // Display Google's official sign-in button
+  useEffect(() => {
+    if (
+      !googleReady ||
+      isSignup ||
+      loginRole !== "USER" ||
+      showForgotPassword ||
+      !googleButtonRef.current
+    ) {
+      return;
+    }
+
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+    if (!clientId) {
+      setGoogleError("Google Client ID is missing.");
+      return;
+    }
+
+    googleButtonRef.current.innerHTML = "";
+
+    window.google.accounts.id.initialize({
+      client_id: clientId,
+
+      callback: async (response) => {
+        try {
+          setGoogleLoading(true);
+          setGoogleError("");
+
+          const result = await fetch("/api/v1/auth/google", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              credential: response.credential,
+            }),
+          });
+
+          const data = await result.json();
+
+          if (!result.ok) {
+            throw new Error(
+              data.detail || "Google login failed."
+            );
+          }
+
+          localStorage.setItem(
+            "access_token",
+            data.access_token
+          );
+
+          localStorage.setItem(
+            "full_name",
+            data.full_name || ""
+          );
+
+          localStorage.setItem(
+            "role",
+            data.role
+          );
+
+          onLoginSuccess(data);
+
+        } catch (error) {
+          setGoogleError(error.message);
+        } finally {
+          setGoogleLoading(false);
+        }
+      },
+    });
+
+    window.google.accounts.id.renderButton(
+  googleButtonRef.current,
+  {
+    theme: "outline",
+    size: "large",
+    text: "continue_with",
+    shape: "rect",
+    width: 350,
+  }
+);
+
+  }, [
+    googleReady,
+    isSignup,
+    loginRole,
+    showForgotPassword,
+    onLoginSuccess,
+  ]);
 
   const goToLogin = () => {
     setShowForgotPassword(false);
@@ -42,7 +159,6 @@ export default function AuthPage({
         aria-modal="true"
         onClick={(event) => event.stopPropagation()}
       >
-
         <div className="image-panel">
           <div className="image-overlay">
             <div className="logo-mark">
@@ -57,9 +173,7 @@ export default function AuthPage({
             type="button"
             className="back-button"
             onClick={
-              showForgotPassword
-                ? goToLogin
-                : onClose
+              showForgotPassword ? goToLogin : onClose
             }
             aria-label="Back"
           >
@@ -166,24 +280,22 @@ export default function AuthPage({
                 </div>
 
                 <div className="social-row">
-
-                  <button
-                    type="button"
-                    className="social-button"
-                  >
-                    <GoogleIcon />
-                    <span>Continue with Google</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className="social-button"
-                  >
-                    <FacebookIcon />
-                    <span>Continue with Facebook</span>
-                  </button>
-
+                  <div
+                    ref={googleButtonRef}
+                    className="google-button-container"
+                  />
                 </div>
+
+                {googleLoading && (
+                  <p>Signing in with Google...</p>
+                )}
+
+                {googleError && (
+                  <p style={{ color: "red" }}>
+                    {googleError}
+                  </p>
+                )}
+
               </>
             )}
 

@@ -15,7 +15,7 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str
     role: str = "USER"
-
+    recaptcha_token: str
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -73,6 +73,9 @@ class OrderItemCreate(BaseModel):
 class OrderCreate(BaseModel):
     items: List[OrderItemCreate] = Field(min_length=1)
     coupon_code: str | None = None
+    delivery_address: Optional[str] = None
+    delivery_latitude: Optional[Decimal] = None
+    delivery_longitude: Optional[Decimal] = None
 
 
 class CartItemAdd(BaseModel):

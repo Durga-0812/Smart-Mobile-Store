@@ -2,6 +2,10 @@
 import hmac
 import secrets
 import smtplib
+import json
+from urllib.parse import urlencode
+from urllib.request import Request as URLRequest, urlopen
+from urllib.error import URLError
 
 from datetime import datetime, timedelta
 from email.message import EmailMessage
@@ -26,9 +30,42 @@ from app.security import (
     get_current_user,
     require_admin,
 )
+from google.auth.transport.requests import Request as GoogleRequest
+from google.oauth2 import id_token
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Auth"])
+def verify_recaptcha(token: str):
+    if not settings.RECAPTCHA_SECRET_KEY:
+        raise HTTPException(
+            status_code=503,
+            detail="CAPTCHA is not configured."
+        )
 
+    data = urlencode({
+        "secret": settings.RECAPTCHA_SECRET_KEY,
+        "response": token
+    }).encode("utf-8")
+
+    request = URLRequest(
+        "https://www.google.com/recaptcha/api/siteverify",
+        data=data
+    )
+
+    try:
+        with urlopen(request, timeout=10) as response:
+            result = json.loads(response.read().decode("utf-8"))
+
+    except Exception:
+        raise HTTPException(
+            status_code=503,
+            detail="CAPTCHA verification service is unavailable."
+        )
+
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=400,
+            detail="CAPTCHA verification failed. Please try again."
+        )
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
@@ -38,6 +75,8 @@ class ResetPasswordRequest(BaseModel):
     email: EmailStr
     otp: str = Field(min_length=6, max_length=6)
     new_password: str = Field(min_length=8, max_length=72)
+class GoogleLoginRequest(BaseModel):
+    credential: str
 
 
 # ---------------- SIGNUP ----------------
@@ -85,6 +124,7 @@ def login(
     payload: LoginRequest,
     db: Session = Depends(get_db),
 ):
+    verify_recaptcha(payload.recaptcha_token)
     requested_role = payload.role.upper()
 
     if requested_role not in ("USER", "ADMIN"):
@@ -128,7 +168,67 @@ def login(
         "full_name": user.full_name,
     }
 
+# ---------------- GOOGLE LOGIN ----------------
 
+@router.post("/google", response_model=TokenResponse)
+def google_login(
+    payload: GoogleLoginRequest,
+    db: Session = Depends(get_db),
+):
+    if not settings.GOOGLE_CLIENT_ID:
+        raise HTTPException(
+            status_code=503,
+            detail="Google authentication is not configured.",
+        )
+
+    try:
+        google_user = id_token.verify_oauth2_token(
+            payload.credential,
+            GoogleRequest(),
+            settings.GOOGLE_CLIENT_ID,
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid Google authentication token.",
+        )
+
+    email = google_user.get("email", "").strip().lower()
+
+    if not email or not google_user.get("email_verified"):
+        raise HTTPException(
+            status_code=401,
+            detail="Google email is not verified.",
+        )
+
+    user = db.query(User).filter(User.email == email).first()
+
+    if user:
+        if not user.is_active:
+            raise HTTPException(status_code=403, detail="Account disabled.")
+
+        if user.role.upper() != "USER":
+            raise HTTPException(
+                status_code=403,
+                detail="Google login is available only for user accounts.",
+            )
+    else:
+        user = User(
+            email=email,
+            full_name=google_user.get("name", email.split("@")[0])[:120],
+            password_hash=hash_password(secrets.token_urlsafe(32)),
+            role="USER",
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    return {
+        "access_token": create_access_token(str(user.id), user.role),
+        "token_type": "bearer",
+        "role": user.role,
+        "full_name": user.full_name,
+    }
 # ---------------- CURRENT USER ----------------
 
 @router.get("/me", response_model=UserResponse)

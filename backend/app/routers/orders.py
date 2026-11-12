@@ -106,14 +106,21 @@ def create_order(
         total = money(discounted_subtotal + tax + shipping)
 
         order = Order(
-            user_id=current_user.id,
-            status="PENDING",
-            subtotal=subtotal,
-            discount=discount,
-            tax=tax,
-            shipping=shipping,
-            total=total,
-        )
+    user_id=current_user.id,
+    status="PENDING",
+    subtotal=subtotal,
+    discount=discount,
+    tax=tax,
+    shipping=shipping,
+    total=total,
+    delivery_address=(
+        payload.delivery_address.strip()
+        if payload.delivery_address and payload.delivery_address.strip()
+        else None
+    ),
+    delivery_latitude=payload.delivery_latitude,
+    delivery_longitude=payload.delivery_longitude,
+)
         db.add(order)
         db.flush()
 

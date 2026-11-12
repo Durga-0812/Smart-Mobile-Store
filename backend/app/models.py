@@ -74,6 +74,9 @@ class Order(Base):
     tax = Column(Numeric(10, 2), nullable=False, default=0)
     shipping = Column(Numeric(10, 2), nullable=False, default=0)
     total = Column(Numeric(10, 2), nullable=False)
+    delivery_address = Column(Text, nullable=True)
+    delivery_latitude = Column(Numeric(10, 7), nullable=True)
+    delivery_longitude = Column(Numeric(10, 7), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     items = relationship(
