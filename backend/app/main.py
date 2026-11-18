@@ -8,24 +8,28 @@ from fastapi.staticfiles import StaticFiles
 
 from app.database import Base, engine
 from app import models
-from app.routers import auth, products, orders, cart, messages,chatbot
+from app.routers import auth, products, orders, cart, messages,chatbot,analytics,payments
 
 Base.metadata.create_all(bind=engine)
 
-# Safely add delivery columns to existing orders table
+# Safely add delivery and payment columns to existing orders table
 existing_columns = {
     column["name"]
     for column in inspect(engine).get_columns("orders")
 }
 
-delivery_columns = {
+order_columns = {
     "delivery_address": "TEXT",
     "delivery_latitude": "NUMERIC(10, 7)",
     "delivery_longitude": "NUMERIC(10, 7)",
+    "payment_status": "VARCHAR(30) NOT NULL DEFAULT 'PENDING'",
+    "payment_method": "VARCHAR(30)",
+    "razorpay_order_id": "VARCHAR(100)",
+    "razorpay_payment_id": "VARCHAR(100)",
 }
 
 with engine.begin() as connection:
-    for column_name, column_type in delivery_columns.items():
+    for column_name, column_type in order_columns.items():
         if column_name not in existing_columns:
             connection.execute(
                 text(
@@ -34,6 +38,22 @@ with engine.begin() as connection:
                 )
             )
 
+    # Ensure Razorpay references are unique in existing databases.
+    connection.execute(
+        text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS "
+            "ix_orders_razorpay_order_id_unique "
+            "ON orders (razorpay_order_id)"
+        )
+    )
+
+    connection.execute(
+        text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS "
+            "ix_orders_razorpay_payment_id_unique "
+            "ON orders (razorpay_payment_id)"
+        )
+    )
 app = FastAPI(
     title="Smart Mobile Store API",
     version="1.0.0"
@@ -60,6 +80,8 @@ app.include_router(orders.router)
 app.include_router(cart.router)
 app.include_router(messages.router)
 app.include_router(chatbot.router)
+app.include_router(analytics.router)
+app.include_router(payments.router)
 
 # React frontend production files
 FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend-new" / "dist"

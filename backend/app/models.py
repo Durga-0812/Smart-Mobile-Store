@@ -77,6 +77,13 @@ class Order(Base):
     delivery_address = Column(Text, nullable=True)
     delivery_latitude = Column(Numeric(10, 7), nullable=True)
     delivery_longitude = Column(Numeric(10, 7), nullable=True)
+
+    # Payment information
+    payment_status = Column(String(30), nullable=False, default="PENDING")
+    payment_method = Column(String(30), nullable=True)
+    razorpay_order_id = Column(String(100), nullable=True, unique=True)
+    razorpay_payment_id = Column(String(100), nullable=True, unique=True)
+
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     items = relationship(
