@@ -1,32 +1,44 @@
-import smtplib
-from email.message import EmailMessage
+import os
+import httpx
 
-from app.config import settings
+RESEND_API_URL = "https://api.resend.com/emails"
 
 
 def send_email(to: str, subject: str, text: str):
-    if not settings.SMTP_EMAIL or not settings.SMTP_PASSWORD:
-        raise RuntimeError("Gmail SMTP credentials are not configured.")
+    api_key = os.getenv("RESEND_API_KEY")
 
-    message = EmailMessage()
-    message["From"] = f"TechLite <{settings.SMTP_EMAIL}>"
-    message["To"] = to
-    message["Subject"] = subject
-    message.set_content(text)
+    if not api_key:
+        raise RuntimeError("Resend API key is not configured.")
+
+    payload = {
+        "from": "TechLite <onboarding@resend.dev>",
+        "to": [to],
+        "subject": subject,
+        "text": text,
+    }
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
 
     try:
-        with smtplib.SMTP_SSL(
-            settings.SMTP_HOST,
-            settings.SMTP_PORT,
-            timeout=30
-        ) as server:
-            server.login(
-                settings.SMTP_EMAIL,
-                settings.SMTP_PASSWORD
-            )
-            server.send_message(message)
+        response = httpx.post(
+            RESEND_API_URL,
+            json=payload,
+            headers=headers,
+            timeout=30,
+        )
 
-        return {"status": "sent", "to": to}
+        response.raise_for_status()
 
-    except Exception as error:
-        raise RuntimeError(f"Gmail email delivery failed: {error}") from error
+        return {
+            "status": "sent",
+            "to": to,
+            "provider": "Resend",
+        }
+
+    except httpx.HTTPError as error:
+        raise RuntimeError(
+            f"Resend email delivery failed: {error}"
+        ) from error
