@@ -371,8 +371,10 @@
   }
 
   .home-menu > a {
-    display: none;
-  }
+  display: inline-flex;
+  align-items: center;
+  font-size: 14px;
+}
 
   .home-cart-btn {
     padding: 9px;

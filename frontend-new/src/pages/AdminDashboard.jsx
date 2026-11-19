@@ -1,7 +1,25 @@
 import React, { useEffect, useState } from "react";
+
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+} from "recharts";
+
 import "./AdminDashboard.css";
 import AdminOrders from "../components/admin/AdminOrders";
 import AdminMessages from "../components/admin/AdminMessages";
+
 import {
   getCanonicalCategory,
   getCategoryId,
@@ -10,6 +28,15 @@ import {
 } from "../data/categories";
 
 const API = "/api/v1";
+
+const CHART_COLORS = [
+  "#7000c8",
+  "#16a085",
+  "#f39c12",
+  "#e74c3c",
+  "#3498db",
+  "#9b59b6",
+];
 
 const emptyProduct = {
   name: "",
@@ -96,12 +123,17 @@ function isValidImageURL(value) {
 
 export default function AdminDashboard({ fullName, onLogout }) {
   const [section, setSection] = useState("Dashboard");
+
   const [theme, setTheme] = useState(
     () => localStorage.getItem("techlite_theme") || "light"
   );
 
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
+
+  const [analyticsData, setAnalyticsData] = useState(null);
+  const [analyticsError, setAnalyticsError] = useState("");
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -125,9 +157,20 @@ export default function AdminDashboard({ fullName, onLogout }) {
     setError("");
 
     try {
-      const [productResponse, customerResponse] = await Promise.all([
+      const [
+        productResponse,
+        customerResponse,
+        analyticsResponse,
+      ] = await Promise.all([
         fetch(`${API}/products/`),
+
         fetch(`${API}/auth/admin/users`, {
+          headers: {
+            Authorization: `Bearer ${token()}`,
+          },
+        }),
+
+        fetch(`${API}/admin/analytics/overview`, {
           headers: {
             Authorization: `Bearer ${token()}`,
           },
@@ -140,16 +183,36 @@ export default function AdminDashboard({ fullName, onLogout }) {
 
       const productData = await productResponse.json();
 
-      setProducts(Array.isArray(productData) ? productData : []);
+      setProducts(
+        Array.isArray(productData) ? productData : []
+      );
 
       if (customerResponse.ok) {
         const customerData = await customerResponse.json();
-        setCustomers(Array.isArray(customerData) ? customerData : []);
+
+        setCustomers(
+          Array.isArray(customerData) ? customerData : []
+        );
       } else {
         setCustomers([]);
       }
+
+      if (analyticsResponse.ok) {
+        const analytics = await analyticsResponse.json();
+
+        setAnalyticsData(analytics);
+        setAnalyticsError("");
+      } else {
+        setAnalyticsData(null);
+
+        setAnalyticsError(
+          "Unable to load analytics. Please check the admin login and analytics API."
+        );
+      }
     } catch (err) {
-      setError(err.message || "Unable to load dashboard data.");
+      setError(
+        err.message || "Unable to load dashboard data."
+      );
     } finally {
       setLoading(false);
     }
@@ -175,7 +238,9 @@ export default function AdminDashboard({ fullName, onLogout }) {
       description: product.description ?? "",
       price: String(product.price ?? ""),
       category: getCanonicalCategory(product.category),
-      stock_quantity: String(product.stock_quantity ?? ""),
+      stock_quantity: String(
+        product.stock_quantity ?? ""
+      ),
       image_url: product.image_url ?? "",
     });
 
@@ -195,6 +260,7 @@ export default function AdminDashboard({ fullName, onLogout }) {
 
   async function saveProduct(event) {
     event.preventDefault();
+
     setError("");
     setNotice("");
 
@@ -220,7 +286,9 @@ export default function AdminDashboard({ fullName, onLogout }) {
       !Number.isInteger(stock) ||
       stock < 0
     ) {
-      setError("Stock quantity must be a non-negative whole number.");
+      setError(
+        "Stock quantity must be a non-negative whole number."
+      );
       return;
     }
 
@@ -230,7 +298,9 @@ export default function AdminDashboard({ fullName, onLogout }) {
     }
 
     if (!isValidImageURL(form.image_url.trim())) {
-      setError("Image URL must start with http:// or https://.");
+      setError(
+        "Image URL must start with http:// or https://."
+      );
       return;
     }
 
@@ -271,7 +341,9 @@ export default function AdminDashboard({ fullName, onLogout }) {
 
         throw new Error(
           message ||
-            `Unable to ${editingId ? "update" : "create"} product.`
+            `Unable to ${
+              editingId ? "update" : "create"
+            } product.`
         );
       }
 
@@ -309,7 +381,9 @@ export default function AdminDashboard({ fullName, onLogout }) {
     }
 
     if (!token()) {
-      setError("Your login session is missing. Please log in again.");
+      setError(
+        "Your login session is missing. Please log in again."
+      );
       event.target.value = "";
       return;
     }
@@ -321,7 +395,9 @@ export default function AdminDashboard({ fullName, onLogout }) {
       const parsedRows = parseCSV(text);
 
       if (parsedRows.length < 2) {
-        throw new Error("The CSV file does not contain product rows.");
+        throw new Error(
+          "The CSV file does not contain product rows."
+        );
       }
 
       const headers = parsedRows[0].map((header) =>
@@ -356,11 +432,14 @@ export default function AdminDashboard({ fullName, onLogout }) {
 
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
+
         const price = Number(row.price);
         const stock = Number(row.stock_quantity);
 
         if (!row.name.trim()) {
-          throw new Error(`Row ${i + 2}: Product name is required.`);
+          throw new Error(
+            `Row ${i + 2}: Product name is required.`
+          );
         }
 
         if (
@@ -368,7 +447,9 @@ export default function AdminDashboard({ fullName, onLogout }) {
           !Number.isFinite(price) ||
           price < 0
         ) {
-          throw new Error(`Row ${i + 2}: Invalid product price.`);
+          throw new Error(
+            `Row ${i + 2}: Invalid product price.`
+          );
         }
 
         if (
@@ -382,7 +463,9 @@ export default function AdminDashboard({ fullName, onLogout }) {
         }
 
         if (!row.category.trim()) {
-          throw new Error(`Row ${i + 2}: Category is required.`);
+          throw new Error(
+            `Row ${i + 2}: Category is required.`
+          );
         }
 
         if (!isValidImageURL(row.image_url.trim())) {
@@ -396,7 +479,9 @@ export default function AdminDashboard({ fullName, onLogout }) {
       const namesInFile = new Set();
 
       for (const row of rows) {
-        const normalizedName = row.name.trim().toLowerCase();
+        const normalizedName = row.name
+          .trim()
+          .toLowerCase();
 
         if (namesInFile.has(normalizedName)) {
           duplicateNames.add(row.name.trim());
@@ -433,20 +518,25 @@ export default function AdminDashboard({ fullName, onLogout }) {
           name: row.name.trim(),
           description: row.description.trim(),
           price: Number(row.price),
-          category: getCanonicalCategory(row.category.trim()),
+          category: getCanonicalCategory(
+            row.category.trim()
+          ),
           stock_quantity: Number(row.stock_quantity),
           image_url: row.image_url.trim() || null,
         };
 
         try {
-          const response = await fetch(`${API}/products/`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token()}`,
-            },
-            body: JSON.stringify(payload),
-          });
+          const response = await fetch(
+            `${API}/products/`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token()}`,
+              },
+              body: JSON.stringify(payload),
+            }
+          );
 
           const data = await response.json().catch(() => null);
 
@@ -457,7 +547,9 @@ export default function AdminDashboard({ fullName, onLogout }) {
               ? detail.map((item) => item.msg).join(", ")
               : detail;
 
-            throw new Error(message || `HTTP ${response.status}`);
+            throw new Error(
+              message || `HTTP ${response.status}`
+            );
           }
 
           added++;
@@ -474,7 +566,8 @@ export default function AdminDashboard({ fullName, onLogout }) {
 
       if (failed.length > 0) {
         setError(
-          "Some products failed: " + failed.slice(0, 5).join(" | ")
+          "Some products failed: " +
+            failed.slice(0, 5).join(" | ")
         );
       }
     } catch (err) {
@@ -497,12 +590,15 @@ export default function AdminDashboard({ fullName, onLogout }) {
     setNotice("");
 
     try {
-      const response = await fetch(`${API}/products/${product.id}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token()}`,
-        },
-      });
+      const response = await fetch(
+        `${API}/products/${product.id}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token()}`,
+          },
+        }
+      );
 
       if (!response.ok) {
         const data = await response.json().catch(() => null);
@@ -515,6 +611,7 @@ export default function AdminDashboard({ fullName, onLogout }) {
       }
 
       setNotice("Product deleted successfully.");
+
       await loadData();
     } catch (err) {
       setError(err.message || "Unable to delete product.");
@@ -531,12 +628,33 @@ export default function AdminDashboard({ fullName, onLogout }) {
     ["Settings", "⚙"],
   ];
 
-  const categorySummaries = PRODUCT_CATEGORIES.map((category) => ({
-    ...category,
-    productCount: products.filter(
-      (product) => getCategoryId(product.category) === category.id
-    ).length,
-  }));
+  const categorySummaries = PRODUCT_CATEGORIES.map(
+    (category) => ({
+      ...category,
+      productCount: products.filter(
+        (product) =>
+          getCategoryId(product.category) === category.id
+      ).length,
+    })
+  );
+
+  // Chart data
+  const monthly = analyticsData?.monthly || [];
+  const orderStatus = analyticsData?.order_status || [];
+  const topProducts = analyticsData?.top_products || [];
+  const lowStock = analyticsData?.low_stock_products || [];
+
+  const chartCardStyle = {
+    padding: "20px",
+    minWidth: 0,
+  };
+
+  const chartTitleStyle = {
+    marginTop: 0,
+    marginBottom: "18px",
+    fontSize: "17px",
+    fontWeight: "600",
+  };
 
   return (
     <div className="admin-layout" data-theme={theme}>
@@ -549,7 +667,9 @@ export default function AdminDashboard({ fullName, onLogout }) {
           {menuItems.map(([label, symbol]) => (
             <button
               key={label}
-              className={section === label ? "selected" : ""}
+              className={
+                section === label ? "selected" : ""
+              }
               onClick={() => {
                 setSection(label);
                 setShowForm(false);
@@ -563,7 +683,10 @@ export default function AdminDashboard({ fullName, onLogout }) {
           ))}
         </nav>
 
-        <button className="admin-logout" onClick={onLogout}>
+        <button
+          className="admin-logout"
+          onClick={onLogout}
+        >
           ⇥ Logout
         </button>
       </aside>
@@ -572,21 +695,32 @@ export default function AdminDashboard({ fullName, onLogout }) {
         <header className="admin-topbar">
           <div>
             <h1>{section}</h1>
-            <p>Welcome back, {fullName || "Administrator"}</p>
+            <p>
+              Welcome back, {fullName || "Administrator"}
+            </p>
           </div>
 
-          <button className="admin-refresh" onClick={loadData}>
+          <button
+            className="admin-refresh"
+            onClick={loadData}
+          >
             Refresh data
           </button>
         </header>
 
-        {error && <div className="admin-error">{error}</div>}
-        {notice && <div className="admin-notice">{notice}</div>}
+        {error && (
+          <div className="admin-error">{error}</div>
+        )}
+
+        {notice && (
+          <div className="admin-notice">{notice}</div>
+        )}
 
         {loading ? (
           <p>Loading dashboard data...</p>
         ) : (
           <>
+            {/* Main Summary Cards */}
             <div className="admin-stats">
               <article className="admin-stat">
                 <span className="stat-icon">▣</span>
@@ -623,6 +757,411 @@ export default function AdminDashboard({ fullName, onLogout }) {
                 </div>
               </article>
             </div>
+
+            {/* =====================================
+                DASHBOARD ANALYTICS
+            ===================================== */}
+
+            {section === "Dashboard" && (
+              <section
+                style={{
+                  margin: "22px 0",
+                  display: "grid",
+                  gap: "20px",
+                }}
+              >
+                {analyticsError && (
+                  <div
+                    className="admin-error"
+                    role="alert"
+                  >
+                    {analyticsError}
+                  </div>
+                )}
+
+                {!analyticsData ? (
+                  !analyticsError && (
+                    <div
+                      className="admin-panel"
+                      style={{ padding: "20px" }}
+                    >
+                      Loading analytics...
+                    </div>
+                  )
+                ) : (
+                  <>
+                    {/* Analytics Summary */}
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns:
+                          "repeat(auto-fit, minmax(170px, 1fr))",
+                        gap: "14px",
+                      }}
+                    >
+                      {[
+                        [
+                          "Total Orders",
+                          analyticsData.summary?.total_orders ?? 0,
+                        ],
+                        [
+                          "Order Value",
+                          `₹${Number(
+                            analyticsData.summary?.total_order_value ?? 0
+                          ).toLocaleString("en-IN", {
+                            maximumFractionDigits: 2,
+                          })}`,
+                        ],
+                        [
+                          "Cancelled Orders",
+                          analyticsData.summary?.cancelled_orders ?? 0,
+                        ],
+                        [
+                          "Low Stock Products",
+                          analyticsData.summary?.low_stock_count ?? 0,
+                        ],
+                      ].map(([label, value]) => (
+                        <article
+                          className="admin-stat"
+                          key={label}
+                        >
+                          <div>
+                            <p>{label}</p>
+                            <strong>{value}</strong>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+
+                    {/* Monthly Orders and Monthly Order Value */}
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns:
+                          "repeat(auto-fit, minmax(280px, 1fr))",
+                        gap: "18px",
+                      }}
+                    >
+                      <article
+                        className="admin-panel"
+                        style={chartCardStyle}
+                      >
+                        <h3 style={chartTitleStyle}>
+                          Monthly Orders
+                        </h3>
+
+                        {monthly.length > 0 ? (
+                          <ResponsiveContainer
+                            width="100%"
+                            height={260}
+                          >
+                            <BarChart data={monthly}>
+                              <CartesianGrid
+                                strokeDasharray="3 3"
+                              />
+
+                              <XAxis dataKey="month" />
+
+                              <YAxis
+                                allowDecimals={false}
+                              />
+
+                              <Tooltip />
+
+                              <Bar
+                                dataKey="orders"
+                                name="Orders"
+                                fill="#7000c8"
+                                radius={[5, 5, 0, 0]}
+                              />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <p>No monthly order data available.</p>
+                        )}
+                      </article>
+
+                      <article
+                        className="admin-panel"
+                        style={chartCardStyle}
+                      >
+                        <h3 style={chartTitleStyle}>
+                          Monthly Order Value
+                        </h3>
+
+                        {monthly.length > 0 ? (
+                          <ResponsiveContainer
+                            width="100%"
+                            height={260}
+                          >
+                            <LineChart data={monthly}>
+                              <CartesianGrid
+                                strokeDasharray="3 3"
+                              />
+
+                              <XAxis dataKey="month" />
+
+                              <YAxis />
+
+                              <Tooltip
+                                formatter={(value) =>
+                                  `₹${Number(value).toLocaleString(
+                                    "en-IN"
+                                  )}`
+                                }
+                              />
+
+                              <Line
+                                type="monotone"
+                                dataKey="order_value"
+                                name="Order Value"
+                                stroke="#16a085"
+                                strokeWidth={3}
+                                activeDot={{ r: 7 }}
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <p>
+                            No monthly order value available.
+                          </p>
+                        )}
+                      </article>
+                    </div>
+
+                    {/* Monthly Customer Registrations */}
+                    <article
+                      className="admin-panel"
+                      style={chartCardStyle}
+                    >
+                      <h3 style={chartTitleStyle}>
+                        Monthly Customer Registrations
+                      </h3>
+
+                      {monthly.length > 0 ? (
+                        <ResponsiveContainer
+                          width="100%"
+                          height={260}
+                        >
+                          <BarChart data={monthly}>
+                            <CartesianGrid
+                              strokeDasharray="3 3"
+                            />
+
+                            <XAxis dataKey="month" />
+
+                            <YAxis
+                              allowDecimals={false}
+                            />
+
+                            <Tooltip />
+
+                            <Bar
+                              dataKey="customers"
+                              name="New Customers"
+                              fill="#3498db"
+                              radius={[5, 5, 0, 0]}
+                            />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <p>
+                          No customer registration data available.
+                        </p>
+                      )}
+                    </article>
+
+                    {/* Order Status and Top Products */}
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns:
+                          "repeat(auto-fit, minmax(280px, 1fr))",
+                        gap: "18px",
+                      }}
+                    >
+                      {/* Order Status Pie Chart */}
+                      <article
+                        className="admin-panel"
+                        style={chartCardStyle}
+                      >
+                        <h3 style={chartTitleStyle}>
+                          Order Status Distribution
+                        </h3>
+
+                        {orderStatus.length > 0 ? (
+                          <ResponsiveContainer
+                            width="100%"
+                            height={280}
+                          >
+                            <PieChart>
+                              <Pie
+                                data={orderStatus}
+                                dataKey="count"
+                                nameKey="status"
+                                cx="50%"
+                                cy="50%"
+                                outerRadius={90}
+                                label
+                              >
+                                {orderStatus.map(
+                                  (entry, index) => (
+                                    <Cell
+                                      key={
+                                        entry.status || index
+                                      }
+                                      fill={
+                                        CHART_COLORS[
+                                          index %
+                                            CHART_COLORS.length
+                                        ]
+                                      }
+                                    />
+                                  )
+                                )}
+                              </Pie>
+
+                              <Tooltip />
+                              <Legend />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <p>
+                            No order status data available.
+                          </p>
+                        )}
+                      </article>
+
+                      {/* Top 5 Products */}
+                      <article
+                        className="admin-panel"
+                        style={chartCardStyle}
+                      >
+                        <h3 style={chartTitleStyle}>
+                          Top 5 Ordered Products
+                        </h3>
+
+                        {topProducts.length > 0 ? (
+                          <ResponsiveContainer
+                            width="100%"
+                            height={280}
+                          >
+                            <BarChart
+                              data={topProducts}
+                              layout="vertical"
+                              margin={{
+                                left: 15,
+                                right: 20,
+                              }}
+                            >
+                              <CartesianGrid
+                                strokeDasharray="3 3"
+                              />
+
+                              <XAxis
+                                type="number"
+                                allowDecimals={false}
+                              />
+
+                              <YAxis
+                                type="category"
+                                dataKey="name"
+                                width={120}
+                                tick={{ fontSize: 11 }}
+                              />
+
+                              <Tooltip />
+
+                              <Bar
+                                dataKey="units_sold"
+                                name="Units Sold"
+                                fill="#f39c12"
+                                radius={[0, 5, 5, 0]}
+                              />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <p>
+                            No ordered products available.
+                          </p>
+                        )}
+                      </article>
+                    </div>
+
+                    {/* Low Stock Products */}
+                    <article
+                      className="admin-panel"
+                      style={chartCardStyle}
+                    >
+                      <h3 style={chartTitleStyle}>
+                        Low Stock Products
+                      </h3>
+
+                      {lowStock.length > 0 ? (
+                        <ResponsiveContainer
+                          width="100%"
+                          height={Math.max(
+                            220,
+                            lowStock.length * 55
+                          )}
+                        >
+                          <BarChart
+                            data={lowStock}
+                            layout="vertical"
+                            margin={{
+                              left: 15,
+                              right: 25,
+                            }}
+                          >
+                            <CartesianGrid
+                              strokeDasharray="3 3"
+                            />
+
+                            <XAxis
+                              type="number"
+                              allowDecimals={false}
+                            />
+
+                            <YAxis
+                              type="category"
+                              dataKey="name"
+                              width={150}
+                              tick={{ fontSize: 11 }}
+                            />
+
+                            <Tooltip />
+
+                            <Bar
+                              dataKey="stock_quantity"
+                              name="Available Stock"
+                              fill="#e74c3c"
+                              radius={[0, 5, 5, 0]}
+                            />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <p>No low-stock products found.</p>
+                      )}
+                    </article>
+
+                    <p
+                      style={{
+                        fontSize: "12px",
+                        opacity: 0.75,
+                        margin: 0,
+                      }}
+                    >
+                      Order Value includes non-cancelled orders;
+                      it is not confirmed payment revenue.
+                    </p>
+                  </>
+                )}
+              </section>
+            )}
+
+            {/* =====================================
+                EXISTING ADMIN SECTIONS
+            ===================================== */}
 
             <section className="admin-panel">
               {section !== "Orders" && (
@@ -684,15 +1223,22 @@ export default function AdminDashboard({ fullName, onLogout }) {
               {section === "Products" && (
                 <p>
                   CSV upload supports up to 50 products at a time.
-                  Each row must include a product name, category, price,
-                  stock quantity, and an optional direct image URL.
+                  Each row must include a product name, category,
+                  price, stock quantity, and an optional direct
+                  image URL.
                 </p>
               )}
 
+              {/* Add/Edit Product Form */}
               {showForm && section === "Products" && (
-                <form className="product-admin-form" onSubmit={saveProduct}>
+                <form
+                  className="product-admin-form"
+                  onSubmit={saveProduct}
+                >
                   <h3>
-                    {editingId ? "Edit Product" : "Add New Product"}
+                    {editingId
+                      ? "Edit Product"
+                      : "Add New Product"}
                   </h3>
 
                   <div className="product-form-grid">
@@ -719,11 +1265,16 @@ export default function AdminDashboard({ fullName, onLogout }) {
                           Choose a category
                         </option>
 
-                        {PRODUCT_CATEGORIES.map((category) => (
-                          <option key={category.id} value={category.name}>
-                            {category.name}
-                          </option>
-                        ))}
+                        {PRODUCT_CATEGORIES.map(
+                          (category) => (
+                            <option
+                              key={category.id}
+                              value={category.name}
+                            >
+                              {category.name}
+                            </option>
+                          )
+                        )}
                       </select>
                     </label>
 
@@ -767,6 +1318,7 @@ export default function AdminDashboard({ fullName, onLogout }) {
                     {form.image_url && (
                       <div className="product-form-full">
                         <p>Image preview:</p>
+
                         <img
                           src={form.image_url}
                           alt="Product preview"
@@ -778,10 +1330,12 @@ export default function AdminDashboard({ fullName, onLogout }) {
                             borderRadius: "8px",
                           }}
                           onError={(event) => {
-                            event.currentTarget.style.display = "none";
+                            event.currentTarget.style.display =
+                              "none";
                           }}
                           onLoad={(event) => {
-                            event.currentTarget.style.display = "block";
+                            event.currentTarget.style.display =
+                              "block";
                           }}
                         />
                       </div>
@@ -799,7 +1353,10 @@ export default function AdminDashboard({ fullName, onLogout }) {
                   </div>
 
                   <div className="product-form-actions">
-                    <button type="submit" disabled={saving || bulkUploading}>
+                    <button
+                      type="submit"
+                      disabled={saving || bulkUploading}
+                    >
                       {saving
                         ? "Saving..."
                         : editingId
@@ -822,9 +1379,13 @@ export default function AdminDashboard({ fullName, onLogout }) {
                 </form>
               )}
 
-              {section === "Dashboard" || section === "Products" ? (
+              {/* Products and Dashboard Product Overview */}
+              {section === "Dashboard" ||
+              section === "Products" ? (
                 products.length === 0 ? (
-                  <p>No products found in the database.</p>
+                  <p>
+                    No products found in the database.
+                  </p>
                 ) : (
                   <div className="admin-table-wrapper">
                     <table className="admin-table">
@@ -835,7 +1396,10 @@ export default function AdminDashboard({ fullName, onLogout }) {
                           <th>Category</th>
                           <th>Price</th>
                           <th>Stock</th>
-                          {section === "Products" && <th>Actions</th>}
+
+                          {section === "Products" && (
+                            <th>Actions</th>
+                          )}
                         </tr>
                       </thead>
 
@@ -855,7 +1419,8 @@ export default function AdminDashboard({ fullName, onLogout }) {
                                     borderRadius: "6px",
                                   }}
                                   onError={(event) => {
-                                    event.currentTarget.style.display = "none";
+                                    event.currentTarget.style.display =
+                                      "none";
                                   }}
                                 />
                               ) : (
@@ -864,21 +1429,32 @@ export default function AdminDashboard({ fullName, onLogout }) {
                             </td>
 
                             <td>{product.name}</td>
-                            <td>{getCategoryName(product.category)}</td>
+
                             <td>
-                              ₹
-                              {Number(product.price || 0).toLocaleString(
-                                "en-IN"
+                              {getCategoryName(
+                                product.category
                               )}
                             </td>
-                            <td>{product.stock_quantity ?? "—"}</td>
+
+                            <td>
+                              ₹
+                              {Number(
+                                product.price || 0
+                              ).toLocaleString("en-IN")}
+                            </td>
+
+                            <td>
+                              {product.stock_quantity ?? "—"}
+                            </td>
 
                             {section === "Products" && (
                               <td>
                                 <div className="product-row-actions">
                                   <button
                                     type="button"
-                                    onClick={() => openEditForm(product)}
+                                    onClick={() =>
+                                      openEditForm(product)
+                                    }
                                   >
                                     Edit
                                   </button>
@@ -886,7 +1462,9 @@ export default function AdminDashboard({ fullName, onLogout }) {
                                   <button
                                     type="button"
                                     className="delete-button"
-                                    onClick={() => deleteProduct(product)}
+                                    onClick={() =>
+                                      deleteProduct(product)
+                                    }
                                     disabled={bulkUploading}
                                   >
                                     Delete
@@ -902,7 +1480,9 @@ export default function AdminDashboard({ fullName, onLogout }) {
                 )
               ) : section === "Customers" ? (
                 customers.length === 0 ? (
-                  <p>No customer accounts are available to display.</p>
+                  <p>
+                    No customer accounts are available to display.
+                  </p>
                 ) : (
                   <div className="admin-table-wrapper">
                     <table className="admin-table">
@@ -931,15 +1511,24 @@ export default function AdminDashboard({ fullName, onLogout }) {
               ) : section === "Categories" ? (
                 <div className="admin-category-grid">
                   {categorySummaries.map((category) => (
-                    <article className="admin-category-card" key={category.id}>
-                      <span className="admin-category-icon" aria-hidden="true">
+                    <article
+                      className="admin-category-card"
+                      key={category.id}
+                    >
+                      <span
+                        className="admin-category-icon"
+                        aria-hidden="true"
+                      >
                         {category.icon}
                       </span>
 
                       <div>
                         <h3>{category.name}</h3>
+
                         <p>
-                          <strong>{category.productCount}</strong>{" "}
+                          <strong>
+                            {category.productCount}
+                          </strong>{" "}
                           {category.productCount === 1
                             ? "product"
                             : "products"}
@@ -952,15 +1541,17 @@ export default function AdminDashboard({ fullName, onLogout }) {
                 <div className="admin-settings">
                   <div>
                     <h3>Appearance</h3>
+
                     <p>
-                      Choose the theme used across the TechLite dashboard
-                      and store.
+                      Choose the theme used across the TechLite
+                      dashboard and store.
                     </p>
                   </div>
 
                   <div className="admin-setting-row">
                     <div>
                       <strong>Dark mode</strong>
+
                       <span>
                         Reduce brightness with a darker interface.
                       </span>
@@ -976,7 +1567,9 @@ export default function AdminDashboard({ fullName, onLogout }) {
                       aria-label="Dark mode"
                       onClick={() =>
                         setTheme((current) =>
-                          current === "light" ? "dark" : "light"
+                          current === "light"
+                            ? "dark"
+                            : "light"
                         )
                       }
                     >
@@ -984,9 +1577,9 @@ export default function AdminDashboard({ fullName, onLogout }) {
                     </button>
                   </div>
                 </div>
-             ) : section === "Messages" ? (
-  <AdminMessages />
-) : null}
+              ) : section === "Messages" ? (
+                <AdminMessages />
+              ) : null}
             </section>
           </>
         )}

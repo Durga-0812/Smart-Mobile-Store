@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useCart } from "../../hooks/useCart";
 import "./Chatbot.css";
 
 const CHAT_URL = "/api/v1/chatbot/chat";
@@ -74,13 +75,71 @@ const isOrderQuestion = (text) => {
     return true;
   }
 
-  // Also accept an order ID sent by itself.
   const possibleOrderId = text.trim();
 
   return /^[A-Z2-7]{8,32}$/i.test(possibleOrderId);
 };
 
+// Detect shopping-cart questions.
+const isCartQuestion = (text) => {
+  const lower = text.toLowerCase();
+
+  const englishPatterns = [
+    "my cart",
+    "show cart",
+    "view cart",
+    "open cart",
+    "cart items",
+    "items in cart",
+    "cart total",
+    "cart value",
+    "what is in my cart",
+    "what's in my cart",
+    "what did i add",
+    "what have i added",
+    "products i added",
+    "my shopping bag",
+    "show my bag",
+    "my bag",
+    "cart",
+    "shopping bag",
+  ];
+
+  const teluguPatterns = [
+    "నా కార్ట్",
+    "కార్ట్ చూపించు",
+    "నా కార్ట్ లో",
+    "కార్ట్ లో ఏమున్నాయి",
+    "నేను ఏమి యాడ్ చేశాను",
+    "నా బ్యాగ్",
+    "నా కార్ట్ మొత్తం",
+  ];
+
+  return (
+    englishPatterns.some((pattern) =>
+      lower.includes(pattern)
+    ) ||
+    teluguPatterns.some((pattern) =>
+      text.includes(pattern)
+    )
+  );
+};
+
+const formatPrice = (price) =>
+  new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 2,
+  }).format(Number(price) || 0);
+
 export default function Chatbot() {
+  const {
+    cartItems = [],
+    totalItems = 0,
+    totalPrice = 0,
+    cartLoading = false,
+  } = useCart();
+
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -160,19 +219,76 @@ export default function Chatbot() {
     window.speechSynthesis.speak(utterance);
   };
 
-  const addAssistantMessage = (text, replyLanguage) => {
+  const addAssistantMessage = (
+    text,
+    replyLanguage,
+    cartSnapshot = null
+  ) => {
     setMessages((previous) => [
       ...previous,
       {
         role: "assistant",
         text,
         language: replyLanguage,
+        cartSnapshot,
       },
     ]);
 
     if (voiceEnabled) {
       speakText(text, replyLanguage);
     }
+  };
+
+  // =================================================
+  // LIVE CART RESPONSE
+  // =================================================
+
+  const getCartResponse = () => {
+    if (cartLoading) {
+      return {
+        text:
+          language === "te"
+            ? "మీ కార్ట్ వివరాలను లోడ్ చేస్తున్నాను. దయచేసి వేచి ఉండండి."
+            : "Your cart is still loading. Please wait a moment.",
+        cartSnapshot: null,
+      };
+    }
+
+    if (!cartItems.length) {
+      return {
+        text:
+          language === "te"
+            ? "మీ కార్ట్ ఖాళీగా ఉంది. 🛒 TechLite లో మీకు నచ్చిన ఉత్పత్తులను జోడించండి!"
+            : "Your shopping cart is currently empty. 🛒 Browse TechLite products and add your favourites!",
+        cartSnapshot: null,
+      };
+    }
+
+    const itemDetails = cartItems.map((item) => ({
+      id: item.id,
+      name: item.name || "Product",
+      image: item.image || item.image_url || "",
+      price: Number(item.priceNum ?? item.price ?? 0),
+      quantity: Number(item.quantity || 0),
+    }));
+
+    const lines = itemDetails.map(
+      (item, index) => {
+        const lineTotal = item.price * item.quantity;
+
+        return `${index + 1}. ${item.name}\n   Price: ${formatPrice(item.price)}\n   Quantity: ${item.quantity}\n   Subtotal: ${formatPrice(lineTotal)}`;
+      }
+    );
+
+    const reply =
+      language === "te"
+        ? `మీ TechLite కార్ట్ వివరాలు 🛒\n\n${lines.join("\n\n")}\n\nమొత్తం ఉత్పత్తుల సంఖ్య: ${totalItems}\nకార్ట్ సబ్‌టోటల్: ${formatPrice(totalPrice)}\n\nమరిన్ని వివరాలు కావాలంటే అడగండి!`
+        : `Here is what you added to your TechLite cart! 🛒\n\n${lines.join("\n\n")}\n\nTotal items: ${totalItems}\nCart subtotal: ${formatPrice(totalPrice)}\n\nWould you like to know anything else about your cart?`;
+
+    return {
+      text: reply,
+      cartSnapshot: itemDetails,
+    };
   };
 
   // =================================================
@@ -206,8 +322,6 @@ export default function Chatbot() {
     }
 
     try {
-      let response;
-
       // 1. IMAGE OR PDF UPLOAD
       if (file) {
         const formData = new FormData();
@@ -219,13 +333,43 @@ export default function Chatbot() {
           getApiLanguage(language)
         );
 
-        response = await fetch(UPLOAD_URL, {
+        const response = await fetch(UPLOAD_URL, {
           method: "POST",
           body: formData,
         });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(
+            typeof data.detail === "string"
+              ? data.detail
+              : "Unable to process your uploaded file."
+          );
+        }
+
+        const reply =
+          data.reply || "I couldn't generate a response.";
+
+        addAssistantMessage(
+          reply,
+          detectReplyLanguage(reply, language)
+        );
+
       }
 
-      // 2. CUSTOMER ORDER SUPPORT
+      // 2. LIVE CART QUESTIONS
+      else if (isCartQuestion(text)) {
+        const result = getCartResponse();
+
+        addAssistantMessage(
+          result.text,
+          detectReplyLanguage(result.text, language),
+          result.cartSnapshot
+        );
+      }
+
+      // 3. CUSTOMER ORDER SUPPORT
       else if (isOrderQuestion(text)) {
         const token = localStorage.getItem("access_token");
 
@@ -237,7 +381,7 @@ export default function Chatbot() {
           );
         }
 
-        response = await fetch(ORDERS_URL, {
+        const response = await fetch(ORDERS_URL, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -248,11 +392,30 @@ export default function Chatbot() {
             language: getApiLanguage(language),
           }),
         });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(
+            typeof data.detail === "string"
+              ? data.detail
+              : "Unable to process your order request."
+          );
+        }
+
+        const reply =
+          data.reply || "I couldn't generate a response.";
+
+        addAssistantMessage(
+          reply,
+          detectReplyLanguage(reply, language)
+        );
+
       }
 
-      // 3. NORMAL PRODUCT SEARCH OR CHAT
+      // 4. NORMAL PRODUCT SEARCH OR CHAT
       else {
-        response = await fetch(CHAT_URL, {
+        const response = await fetch(CHAT_URL, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -262,33 +425,25 @@ export default function Chatbot() {
             language: getApiLanguage(language),
           }),
         });
-      }
 
-      const data = await response.json().catch(() => ({}));
+        const data = await response.json().catch(() => ({}));
 
-      if (!response.ok) {
-        if (response.status === 401) {
+        if (!response.ok) {
           throw new Error(
-            "Your login session has expired. Please log in again."
+            typeof data.detail === "string"
+              ? data.detail
+              : "Unable to process your request."
           );
         }
 
-        throw new Error(
-          typeof data.detail === "string"
-            ? data.detail
-            : "Unable to process your request."
+        const reply =
+          data.reply || "I couldn't generate a response.";
+
+        addAssistantMessage(
+          reply,
+          detectReplyLanguage(reply, language)
         );
       }
-
-      const reply =
-        data.reply || "I couldn't generate a response.";
-
-      const replyLanguage = detectReplyLanguage(
-        reply,
-        language
-      );
-
-      addAssistantMessage(reply, replyLanguage);
 
     } catch (error) {
       console.error("Chatbot error:", error);
@@ -518,7 +673,50 @@ export default function Chatbot() {
                 className={`chat-message ${item.role}`}
               >
 
-                {item.text}
+                <div>{item.text}</div>
+
+                {/* LIVE CART PRODUCT CARDS */}
+                {item.cartSnapshot?.length > 0 && (
+                  <div className="chatbot-cart-products">
+
+                    {item.cartSnapshot.map((product) => (
+                      <div
+                        className="chatbot-cart-product"
+                        key={product.id}
+                      >
+
+                        {product.image && (
+                          <img
+                            src={product.image}
+                            alt={product.name}
+                            className="chatbot-cart-image"
+                          />
+                        )}
+
+                        <div className="chatbot-cart-product-info">
+                          <strong>{product.name}</strong>
+
+                          <span>
+                            Price: {formatPrice(product.price)}
+                          </span>
+
+                          <span>
+                            Quantity: {product.quantity}
+                          </span>
+
+                          <strong>
+                            Subtotal:{" "}
+                            {formatPrice(
+                              product.price * product.quantity
+                            )}
+                          </strong>
+                        </div>
+
+                      </div>
+                    ))}
+
+                  </div>
+                )}
 
                 {item.role === "assistant" && (
                   <button
@@ -643,7 +841,7 @@ export default function Chatbot() {
           </form>
 
           <div className="chatbot-footer">
-            Products · Orders · Support · Photos · PDFs
+            Products · Cart · Orders · Support · Photos · PDFs
           </div>
 
         </div>

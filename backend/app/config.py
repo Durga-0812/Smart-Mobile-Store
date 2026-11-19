@@ -16,8 +16,17 @@ class Settings(BaseSettings):
     SMTP_PORT: int = 465
     SMTP_EMAIL: str = ""
     SMTP_PASSWORD: str = ""
+
     GOOGLE_CLIENT_ID: str = ""
     RECAPTCHA_SECRET_KEY: str = ""
+
+    # Razorpay Test Mode
+    RAZORPAY_KEY_ID: str = ""
+    RAZORPAY_KEY_SECRET: str = ""
+    RAZORPAY_CURRENCY: str = "INR"
+    # n8n Order Email Webhook
+    N8N_ORDER_WEBHOOK_URL: str = ""
+    N8N_WEBHOOK_SECRET: str = ""
 
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env",

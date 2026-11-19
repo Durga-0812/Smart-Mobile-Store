@@ -1,9 +1,12 @@
 ﻿from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
-from typing import List
 
+
+# =========================
+# AUTHENTICATION SCHEMAS
+# =========================
 
 class SignupRequest(BaseModel):
     email: EmailStr
@@ -11,16 +14,20 @@ class SignupRequest(BaseModel):
     full_name: str
     phone: str | None = None
 
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
     role: str = "USER"
     recaptcha_token: str
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     role: str
     full_name: str | None
+
 
 class UserResponse(BaseModel):
     id: str
@@ -29,10 +36,12 @@ class UserResponse(BaseModel):
     phone: str | None
     role: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
+# =========================
+# PRODUCT SCHEMAS
+# =========================
 
 class ProductCreate(BaseModel):
     name: str = Field(min_length=1, max_length=150)
@@ -65,6 +74,11 @@ class ProductResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
+# =========================
+# ORDER SCHEMAS
+# =========================
+
 class OrderItemCreate(BaseModel):
     product_id: str
     quantity: int = Field(gt=0, le=100)
@@ -76,30 +90,6 @@ class OrderCreate(BaseModel):
     delivery_address: Optional[str] = None
     delivery_latitude: Optional[Decimal] = None
     delivery_longitude: Optional[Decimal] = None
-
-
-class CartItemAdd(BaseModel):
-    product_id: str
-    quantity: int = Field(default=1, gt=0, le=100)
-
-
-class CartItemUpdate(BaseModel):
-    quantity: int = Field(gt=0, le=100)
-
-
-class CartProductResponse(BaseModel):
-    id: str
-    name: str
-    price: Decimal
-    stock_quantity: int
-    category: str
-    image_url: Optional[str] = None
-    quantity: int
-
-
-class CartResponse(BaseModel):
-    items: List[CartProductResponse]
-    total_items: int
 
 
 class OrderItemResponse(BaseModel):
@@ -125,12 +115,50 @@ class OrderResponse(BaseModel):
     created_at: datetime
     items: List[OrderItemResponse]
 
+    # Razorpay payment information
+    payment_status: str | None = None
+    payment_method: str | None = None
+    razorpay_order_id: str | None = None
+    razorpay_payment_id: str | None = None
+
     model_config = ConfigDict(from_attributes=True)
 
 
 class OrderStatusUpdate(BaseModel):
     status: str
 
+
+# =========================
+# CART SCHEMAS
+# =========================
+
+class CartItemAdd(BaseModel):
+    product_id: str
+    quantity: int = Field(default=1, gt=0, le=100)
+
+
+class CartItemUpdate(BaseModel):
+    quantity: int = Field(gt=0, le=100)
+
+
+class CartProductResponse(BaseModel):
+    id: str
+    name: str
+    price: Decimal
+    stock_quantity: int
+    category: str
+    image_url: Optional[str] = None
+    quantity: int
+
+
+class CartResponse(BaseModel):
+    items: List[CartProductResponse]
+    total_items: int
+
+
+# =========================
+# MESSAGE SCHEMAS
+# =========================
 
 class MessageCreate(BaseModel):
     name: str = Field(min_length=2, max_length=120)

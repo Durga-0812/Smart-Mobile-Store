@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { QRCodeSVG } from "qrcode.react";
 import { useCart } from "../../hooks/useCart";
 import DeliveryLocation from "../DeliveryLocation";
 import "./CartModal.css";
@@ -8,6 +7,50 @@ const FREE_SHIPPING_LIMIT = 2000;
 const SHIPPING_CHARGE = 99;
 const TAX_RATE = 0.1;
 const API_URL = "/api/v1";
+
+let razorpayScriptPromise = null;
+
+function loadRazorpayScript() {
+  if (window.Razorpay) {
+    return Promise.resolve(true);
+  }
+
+  if (razorpayScriptPromise) {
+    return razorpayScriptPromise;
+  }
+
+  razorpayScriptPromise = new Promise((resolve) => {
+    const script = document.createElement("script");
+
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+
+    script.onload = () => resolve(true);
+    script.onerror = () => {
+      razorpayScriptPromise = null;
+      resolve(false);
+    };
+
+    document.body.appendChild(script);
+  });
+
+  return razorpayScriptPromise;
+}
+
+async function readApiError(response, fallback) {
+  const data = await response.json().catch(() => ({}));
+  const detail = data.detail;
+
+  if (Array.isArray(detail)) {
+    return detail.map((error) => error.msg).join(", ");
+  }
+
+  if (typeof detail === "string") {
+    return detail;
+  }
+
+  return fallback;
+}
 
 export default function CartModal({
   isOpen,
@@ -34,7 +77,6 @@ export default function CartModal({
   const [paymentStep, setPaymentStep] = useState(false);
   const [deliveryStep, setDeliveryStep] = useState(false);
   const [deliveryLocation, setDeliveryLocation] = useState(null);
-  const [demoReference, setDemoReference] = useState("");
   const [orderIdCopied, setOrderIdCopied] = useState(false);
   const [copyError, setCopyError] = useState("");
 
@@ -78,9 +120,10 @@ export default function CartModal({
 
   const handleCopyOrderId = async () => {
     try {
-      await navigator.clipboard.writeText(orderSuccess.id);
+      await navigator.clipboard.writeText(String(orderSuccess.id));
       setOrderIdCopied(true);
       setCopyError("");
+
       window.setTimeout(() => setOrderIdCopied(false), 1800);
     } catch {
       setCopyError("Could not copy the order ID.");
@@ -156,6 +199,7 @@ export default function CartModal({
       if (subtotal < 2000) {
         setAppliedCoupon("");
         setDiscount(0);
+
         showMessage(
           "SAVE200 requires a subtotal of at least ₹2,000.",
           "error"
@@ -166,12 +210,14 @@ export default function CartModal({
       setCoupon(code);
       setAppliedCoupon(code);
       setDiscount(200);
+
       showMessage("Coupon applied! You saved ₹200.", "success");
       return;
     }
 
     setAppliedCoupon("");
     setDiscount(0);
+
     showMessage("Invalid coupon code.", "error");
   };
 
@@ -191,10 +237,11 @@ export default function CartModal({
     setCoupon("");
     setAppliedCoupon("");
     setDiscount(0);
+
     showMessage("Your cart has been cleared.", "success");
   };
 
-  // Open the demo payment screen.
+  // Start checkout and request delivery details.
   const handleCheckout = () => {
     if (cartItems.length === 0) {
       showMessage("Your cart is empty.", "error");
@@ -208,81 +255,241 @@ export default function CartModal({
       return;
     }
 
-    const reference =
-      globalThis.crypto?.randomUUID?.() ||
-      `TL-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-    setDemoReference(reference);
     setDeliveryStep(true);
     setPaymentStep(false);
     showMessage("");
   };
 
-  // This is a DEMO action, not a real payment confirmation.
-const handleDemoPayment = async () => {
-  if (!deliveryLocation) {
-    showMessage("Please select a delivery location.", "error");
-    return;
-  }
-
-  const token = localStorage.getItem("access_token");
-
-  if (!token) {
-    showMessage("Please log in before checkout.", "error");
-    return;
-  }
+  // Verify payment with our backend.
+  const handlePaymentVerification = async (
+    paymentResponse,
+    createdOrder,
+    cartSnapshot
+  ) => {
+    const token = localStorage.getItem("access_token");
 
     try {
       setCheckoutLoading(true);
-      showMessage("");
+      showMessage("Verifying your payment. Please wait...");
 
-      const response = await fetch(`${API_URL}/orders/`, {
+      const verifyResponse = await fetch(`${API_URL}/payments/verify`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-  items: cartItems.map((item) => ({
-    product_id: String(item.id),
-    quantity: Number(item.quantity ?? 1),
-  })),
-  coupon_code: appliedCoupon || null,
-  delivery_address: deliveryLocation?.address || null,
-  delivery_latitude: deliveryLocation?.latitude ?? null,
-  delivery_longitude: deliveryLocation?.longitude ?? null,
-}),
+          razorpay_order_id: paymentResponse.razorpay_order_id,
+          razorpay_payment_id: paymentResponse.razorpay_payment_id,
+          razorpay_signature: paymentResponse.razorpay_signature,
+        }),
       });
 
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        const detail = data.detail;
-
-        const errorMessage = Array.isArray(detail)
-          ? detail.map((error) => error.msg).join(", ")
-          : typeof detail === "string"
-            ? detail
-            : "Order creation failed. Please try again.";
+      if (!verifyResponse.ok) {
+        const errorMessage = await readApiError(
+          verifyResponse,
+          "Payment verification failed."
+        );
 
         throw new Error(errorMessage);
       }
 
-      setOrderSuccess(data);
-      setPaymentStep(false);
+      const verifyData = await verifyResponse.json();
+
+      // Fetch the saved order from our backend.
+      const orderResponse = await fetch(
+        `${API_URL}/orders/${createdOrder.order_id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      let savedOrder = null;
+
+      if (orderResponse.ok) {
+        savedOrder = await orderResponse.json();
+      }
+
+      const receipt = {
+        ...(savedOrder || {}),
+        id: savedOrder?.id ?? createdOrder.order_id,
+        created_at: savedOrder?.created_at ?? new Date().toISOString(),
+        status: savedOrder?.status ?? "CONFIRMED",
+        payment_status: savedOrder?.payment_status ?? "PAID",
+        payment_method: savedOrder?.payment_method ?? "RAZORPAY",
+        razorpay_payment_id: paymentResponse.razorpay_payment_id,
+        subtotal: savedOrder?.subtotal ?? createdOrder.subtotal,
+        discount: savedOrder?.discount ?? createdOrder.discount,
+        tax: savedOrder?.tax ?? createdOrder.tax,
+        shipping: savedOrder?.shipping ?? createdOrder.shipping,
+        total: savedOrder?.total ?? createdOrder.total,
+        items:
+          savedOrder?.items?.length > 0
+            ? savedOrder.items
+            : cartSnapshot.map((item, index) => {
+                const price = Number(
+                  item.priceNum ?? item.price ?? 0
+                );
+
+                const quantity = Number(item.quantity ?? 1);
+
+                return {
+                  id: item.id ?? index,
+                  product_name: item.name,
+                  unit_price: price,
+                  quantity,
+                  line_total: price * quantity,
+                };
+              }),
+      };
+
+      setOrderSuccess(receipt);
+
+      // Clear local cart only after successful backend verification.
       clearLocalCart();
 
       setCoupon("");
       setAppliedCoupon("");
       setDiscount(0);
 
-      showMessage("Demo order created successfully!", "success");
+      setPaymentStep(false);
+      setDeliveryStep(false);
+
+      showMessage(
+        verifyData.message || "Payment verified successfully!",
+        "success"
+      );
     } catch (error) {
       showMessage(
-        error.message || "Unable to create order.",
+        `${error.message} If money was deducted, do not make another payment. Contact TechLite support with your Razorpay payment ID: ${paymentResponse.razorpay_payment_id}`,
         "error"
       );
     } finally {
+      setCheckoutLoading(false);
+    }
+  };
+
+  // Create a Razorpay order and open secure checkout.
+  const handleRazorpayPayment = async () => {
+    if (!deliveryLocation) {
+      showMessage("Please select a delivery location.", "error");
+      return;
+    }
+
+    const token = localStorage.getItem("access_token");
+
+    if (!token) {
+      showMessage("Please log in before checkout.", "error");
+      return;
+    }
+
+    if (cartItems.length === 0) {
+      showMessage("Your cart is empty.", "error");
+      return;
+    }
+
+    const cartSnapshot = cartItems.map((item) => ({ ...item }));
+
+    try {
+      setCheckoutLoading(true);
+      showMessage("");
+
+      // Load Razorpay Checkout.
+      const scriptLoaded = await loadRazorpayScript();
+
+      if (!scriptLoaded) {
+        throw new Error(
+          "Unable to load Razorpay Checkout. Please check your internet connection."
+        );
+      }
+
+      // Ask the backend to calculate the final amount and create an order.
+      const response = await fetch(`${API_URL}/payments/create-order`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          coupon_code: appliedCoupon || null,
+          delivery_address: deliveryLocation.address || null,
+          delivery_latitude: deliveryLocation.latitude ?? null,
+          delivery_longitude: deliveryLocation.longitude ?? null,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          await readApiError(
+            response,
+            "Unable to create payment order."
+          )
+        );
+      }
+
+      const createdOrder = await response.json();
+
+      if (
+        !createdOrder.razorpay_order_id ||
+        !createdOrder.razorpay_key_id ||
+        !createdOrder.amount
+      ) {
+        throw new Error("The backend returned incomplete payment details.");
+      }
+
+      const options = {
+        key: createdOrder.razorpay_key_id,
+        amount: createdOrder.amount,
+        currency: createdOrder.currency || "INR",
+        name: "TechLite",
+        description: "Smart Mobile Store Purchase",
+        order_id: createdOrder.razorpay_order_id,
+
+        handler: async (paymentResponse) => {
+          await handlePaymentVerification(
+            paymentResponse,
+            createdOrder,
+            cartSnapshot
+          );
+        },
+
+        theme: {
+          color: "#6c45a5",
+        },
+
+        modal: {
+          ondismiss: () => {
+            showMessage(
+              "Payment window closed. Your cart has not been cleared.",
+              "info"
+            );
+          },
+        },
+      };
+
+      const razorpay = new window.Razorpay(options);
+
+      razorpay.on("payment.failed", (paymentFailure) => {
+        const description =
+          paymentFailure?.error?.description ||
+          "Payment was unsuccessful.";
+
+        showMessage(
+          `${description} Your cart is still available. If money was deducted, contact support before trying again.`,
+          "error"
+        );
+      });
+
+      setCheckoutLoading(false);
+      razorpay.open();
+    } catch (error) {
+      showMessage(
+        error.message || "Unable to start Razorpay checkout.",
+        "error"
+      );
+
       setCheckoutLoading(false);
     }
   };
@@ -301,13 +508,13 @@ const handleDemoPayment = async () => {
         <header className="cart-header">
           <div className="cart-header-title">
             <h2>
-             {orderSuccess
-  ? "Order Receipt"
-  : deliveryStep
-    ? "Select Delivery Location"
-    : paymentStep
-      ? "Scan & Pay"
-      : "Your Cart"}
+              {orderSuccess
+                ? "Order Receipt"
+                : deliveryStep
+                  ? "Select Delivery Location"
+                  : paymentStep
+                    ? "Secure Payment"
+                    : "Your Cart"}
             </h2>
 
             <span className="cart-badge-count">
@@ -326,8 +533,7 @@ const handleDemoPayment = async () => {
         </header>
 
         <div className="cart-content">
-
-          {/* ORDER RECEIPT */}
+          {/* VERIFIED ORDER RECEIPT */}
           {orderSuccess ? (
             <div className="cart-empty cart-receipt-view">
               <section className="cart-receipt">
@@ -339,8 +545,8 @@ const handleDemoPayment = async () => {
                   Thank you for shopping with TechLite.
                 </p>
 
-                <div className="cart-demo-payment-label">
-                  DEMO PAYMENT — NOT A REAL TRANSACTION
+                <div className="cart-payment-verified-label">
+                  ✓ PAYMENT VERIFIED SUCCESSFULLY
                 </div>
 
                 <dl className="cart-receipt-meta">
@@ -360,6 +566,15 @@ const handleDemoPayment = async () => {
                   </div>
 
                   <div>
+                    <dt>Payment ID</dt>
+                    <dd>
+                      <code>
+                        {orderSuccess.razorpay_payment_id || "Verified"}
+                      </code>
+                    </dd>
+                  </div>
+
+                  <div>
                     <dt>Order date</dt>
                     <dd>
                       {new Date(
@@ -369,8 +584,18 @@ const handleDemoPayment = async () => {
                   </div>
 
                   <div>
-                    <dt>Status</dt>
+                    <dt>Order status</dt>
                     <dd>{orderSuccess.status}</dd>
+                  </div>
+
+                  <div>
+                    <dt>Payment status</dt>
+                    <dd>{orderSuccess.payment_status}</dd>
+                  </div>
+
+                  <div>
+                    <dt>Payment method</dt>
+                    <dd>{orderSuccess.payment_method}</dd>
                   </div>
                 </dl>
 
@@ -381,7 +606,8 @@ const handleDemoPayment = async () => {
                 )}
 
                 <p className="cart-receipt-status-note">
-                  Your demo order has been created and is awaiting processing.
+                  Your payment has been verified by TechLite.
+                  Your order is confirmed.
                 </p>
 
                 <div className="cart-receipt-items">
@@ -391,8 +617,11 @@ const handleDemoPayment = async () => {
                     <span>Amount</span>
                   </div>
 
-                  {(orderSuccess.items ?? []).map((item) => (
-                    <div className="cart-receipt-row" key={item.id}>
+                  {(orderSuccess.items ?? []).map((item, index) => (
+                    <div
+                      className="cart-receipt-row"
+                      key={item.id ?? index}
+                    >
                       <span>
                         {item.product_name}
                         <small>
@@ -460,46 +689,44 @@ const handleDemoPayment = async () => {
                 </button>
               </div>
             </div>
-
           ) : deliveryStep ? (
-
-  /* DELIVERY LOCATION SCREEN */
-  <div className="cart-payment-screen">
-    <button
-      type="button"
-      className="cart-payment-back"
-      onClick={() => setDeliveryStep(false)}
-    >
-      ← Back to Cart
-    </button>
-
-    <DeliveryLocation
-      onLocationSelect={(location) => setDeliveryLocation(location)}
-    />
-
-    {deliveryLocation && (
-      <div style={{ padding: "12px" }}>
-        <p>Delivery location selected successfully!</p>
-
-        <button
-          type="button"
-          className="cart-checkout-btn"
-          onClick={() => {
-            setDeliveryStep(false);
-            setPaymentStep(true);
-          }}
-        >
-          Continue to Payment
-        </button>
-      </div>
-    )}
-  </div>
-
-) : paymentStep ? (
-
-            /* DEMO SCAN AND PAY SCREEN */
+            /* DELIVERY LOCATION SCREEN */
             <div className="cart-payment-screen">
+              <button
+                type="button"
+                className="cart-payment-back"
+                onClick={() => setDeliveryStep(false)}
+              >
+                ← Back to Cart
+              </button>
 
+              <DeliveryLocation
+                onLocationSelect={(location) =>
+                  setDeliveryLocation(location)
+                }
+              />
+
+              {deliveryLocation && (
+                <div style={{ padding: "12px" }}>
+                  <p>Delivery location selected successfully!</p>
+
+                  <button
+                    type="button"
+                    className="cart-checkout-btn"
+                    onClick={() => {
+                      setDeliveryStep(false);
+                      setPaymentStep(true);
+                      showMessage("");
+                    }}
+                  >
+                    Continue to Payment
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : paymentStep ? (
+            /* RAZORPAY PAYMENT SCREEN */
+            <div className="cart-payment-screen">
               <button
                 type="button"
                 className="cart-payment-back"
@@ -507,20 +734,23 @@ const handleDemoPayment = async () => {
                   setPaymentStep(false);
                   showMessage("");
                 }}
+                disabled={checkoutLoading}
               >
                 ← Back to Cart
               </button>
 
               <div className="cart-payment-brand">
                 <span>TechLite</span>
-                <span className="cart-payment-secure">DEMO CHECKOUT</span>
+                <span className="cart-payment-secure">
+                  SECURE CHECKOUT
+                </span>
               </div>
 
-              <h3>Scan & Pay</h3>
+              <h3>Complete Your Payment</h3>
 
               <p className="cart-payment-description">
-                Scan this demonstration QR code to preview the payment
-                experience.
+                Pay securely using Razorpay. Available payment methods
+                depend on your Razorpay checkout configuration.
               </p>
 
               <div className="cart-payment-amount">
@@ -528,37 +758,24 @@ const handleDemoPayment = async () => {
                 <strong>{formatPrice(total)}</strong>
               </div>
 
-              <div className="cart-demo-qr-container">
-                <QRCodeSVG
-                  value={JSON.stringify({
-                    type: "TECHLITE_DEMO_PAYMENT",
-                    reference: demoReference,
-                    amount: Number(total.toFixed(2)),
-                    currency: "INR",
-                  })}
-                  size={210}
-                  level="H"
-                  includeMargin
-                />
+              <div className="cart-razorpay-info">
+                <h4>Secure payment with Razorpay</h4>
+
+                <p>
+                  Your payment will be processed through Razorpay's
+                  secure checkout.
+                </p>
+
+                <p>
+                  You may see supported UPI, card, net banking and
+                  other payment options.
+                </p>
               </div>
 
-              <div className="cart-demo-qr-warning">
-                DEMO QR CODE — NOT A REAL UPI PAYMENT QR
-              </div>
-
-              <p className="cart-payment-instruction">
-                This QR is for project demonstration only.
-                Scanning it will not transfer money.
-              </p>
-
-              <div className="cart-payment-apps">
-                <span className="cart-payment-app gpay">G Pay</span>
-                <span className="cart-payment-app phonepe">PhonePe</span>
-                <span className="cart-payment-app paytm">Paytm</span>
-              </div>
-
-              <div className="cart-payment-reference">
-                Reference: {demoReference}
+              <div className="cart-test-mode-note">
+                <strong>Testing notice:</strong> If your Razorpay account
+                is using Test Mode, use Razorpay test payment details.
+                No real money should be transferred during testing.
               </div>
 
               {message && (
@@ -573,21 +790,20 @@ const handleDemoPayment = async () => {
               <button
                 type="button"
                 className="cart-demo-success-btn"
-                onClick={handleDemoPayment}
+                onClick={handleRazorpayPayment}
                 disabled={checkoutLoading}
               >
                 {checkoutLoading
-                  ? "Creating Demo Order..."
-                  : "✓ Simulate Payment Success"}
+                  ? "Preparing Secure Checkout..."
+                  : `Pay ${formatPrice(total)} securely`}
               </button>
 
-              <p className="cart-demo-disclaimer">
-                For demonstration only. No payment is collected or verified.
+              <p className="cart-payment-instruction">
+                Your cart will only be cleared after the backend
+                successfully verifies your payment.
               </p>
             </div>
-
           ) : !isAuthenticated ? (
-
             <div className="cart-empty cart-auth-required">
               <div className="cart-empty-icon">🔐</div>
               <h3>Sign in to manage your cart</h3>
@@ -614,9 +830,7 @@ const handleDemoPayment = async () => {
                 </button>
               </div>
             </div>
-
           ) : cartItems.length === 0 ? (
-
             <div className="cart-empty">
               <div className="cart-empty-icon">🛒</div>
               <h3>Your cart is empty</h3>
@@ -630,9 +844,7 @@ const handleDemoPayment = async () => {
                 Continue Shopping
               </button>
             </div>
-
           ) : (
-
             <div className="cart-items-list">
               {cartItems.map((item) => {
                 const price = Number(
@@ -711,10 +923,10 @@ const handleDemoPayment = async () => {
 
         {/* CART FOOTER */}
         {!orderSuccess &&
-  !deliveryStep &&
-  !paymentStep &&
-  isAuthenticated &&
-  cartItems.length > 0 && (
+          !deliveryStep &&
+          !paymentStep &&
+          isAuthenticated &&
+          cartItems.length > 0 && (
             <footer className="cart-footer">
               <div className="cart-coupon">
                 <label htmlFor="cart-coupon-input">

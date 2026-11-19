@@ -331,3 +331,50 @@
     height: 35px;
   }
 }
+/* LIVE CART PRODUCT CARDS */
+
+.chatbot-cart-products {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+  width: 100%;
+}
+
+.chatbot-cart-product {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.chatbot-cart-image {
+  width: 65px;
+  height: 65px;
+  object-fit: contain;
+  flex-shrink: 0;
+  background: white;
+  border-radius: 8px;
+}
+
+.chatbot-cart-product-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  font-size: 11px;
+  color: #475569;
+  overflow-wrap: anywhere;
+}
+
+.chatbot-cart-product-info strong:first-child {
+  color: #1e293b;
+  font-size: 12px;
+}
+
+.chatbot-cart-product-info strong:last-child {
+  color: #2563eb;
+}

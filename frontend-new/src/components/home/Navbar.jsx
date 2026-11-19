@@ -56,6 +56,19 @@ Tech <span>Lite</span> </a> </div>
   <div className="home-menu">
     <a href="#home" onClick={onHomeClick}>Home</a>
 
+<a
+  href="#contact"
+  onClick={(event) => {
+    event.preventDefault();
+    document.getElementById("contact")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }}
+>
+  Contact Us
+</a>
+
     <button
       type="button"
       className="home-cart-btn"
