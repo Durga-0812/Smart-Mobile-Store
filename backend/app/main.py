@@ -1,4 +1,11 @@
-﻿from pathlib import Path
+﻿import secrets
+
+from fastapi import Header, HTTPException
+from app.config import settings
+from app.database import SessionLocal
+from app.models import User
+from app.security import hash_password
+from pathlib import Path
 
 from fastapi import FastAPI
 from sqlalchemy import inspect, text
@@ -97,6 +104,54 @@ if (FRONTEND_DIST / "assets").exists():
     )
 
 # Serve React website and frontend routes
+@app.post("/internal/admin-repair", include_in_schema=False)
+def repair_admin(
+    payload: dict,
+    x_admin_setup_secret: str = Header(default="")
+):
+    if not settings.ADMIN_SETUP_SECRET or not secrets.compare_digest(
+        x_admin_setup_secret,
+        settings.ADMIN_SETUP_SECRET
+    ):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    email = str(payload.get("email", "")).strip().lower()
+    password = payload.get("password")
+
+    if email != "techlite.admin@gmail.com":
+        raise HTTPException(status_code=400, detail="Invalid admin email")
+
+    if not isinstance(password, str) or not 12 <= len(password) <= 72:
+        raise HTTPException(
+            status_code=400,
+            detail="Password must be 12–72 characters"
+        )
+
+    db = SessionLocal()
+
+    try:
+        user = db.query(User).filter(User.email == email).first()
+
+        if not user:
+            raise HTTPException(
+                status_code=404,
+                detail="Existing admin account not found"
+            )
+
+        user.password_hash = hash_password(password)
+        user.role = "ADMIN"
+        user.is_active = True
+
+        db.commit()
+
+        return {"message": "Existing admin account updated successfully"}
+
+    except Exception:
+        db.rollback()
+        raise
+
+    finally:
+        db.close()
 @app.get("/{full_path:path}", include_in_schema=False)
 async def serve_frontend(full_path: str):
     requested_file = FRONTEND_DIST / full_path
