@@ -30,7 +30,10 @@ def send_email(to: str, subject: str, text: str):
             timeout=30,
         )
 
-        response.raise_for_status()
+        if response.is_error:
+            raise RuntimeError(
+                f"Resend API error {response.status_code}: {response.text}"
+            )
 
         return {
             "status": "sent",
