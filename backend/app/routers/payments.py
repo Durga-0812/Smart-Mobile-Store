@@ -1,3 +1,4 @@
+import logging
 from decimal import Decimal, ROUND_HALF_UP
 
 import razorpay
@@ -11,6 +12,8 @@ from app.models import CartItem, Order, OrderItem, Product, User
 from app.security import get_current_user
 from app.services.order_webhook import send_order_notification
 
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/api/v1/payments",
@@ -161,7 +164,7 @@ def create_payment_order(
             detail="Invalid payment amount.",
         )
 
-    # Create a local pending order first.
+    # Create a local pending order.
     order = Order(
         user_id=current_user.id,
         status="PENDING",
@@ -181,13 +184,13 @@ def create_payment_order(
         db.add(order)
         db.flush()
 
-        # Create Razorpay order. Amount must be in paise.
+        # Razorpay amount must be in paise.
         amount_in_paise = int(total * 100)
 
         razorpay_order = client.order.create({
             "amount": amount_in_paise,
             "currency": settings.RAZORPAY_CURRENCY,
-            "receipt": order.id,
+            "receipt": str(order.id),
         })
 
         order.razorpay_order_id = razorpay_order["id"]
@@ -211,8 +214,14 @@ def create_payment_order(
         db.rollback()
         raise
 
-    except Exception:
+    except Exception as exc:
         db.rollback()
+
+        logger.exception(
+            "Razorpay order creation failed: %s",
+            exc,
+        )
+
         raise HTTPException(
             status_code=502,
             detail="Unable to create Razorpay payment order.",
@@ -280,7 +289,12 @@ def verify_payment(
             "razorpay_signature": request.razorpay_signature,
         })
 
-    except Exception:
+    except Exception as exc:
+        logger.exception(
+            "Razorpay signature verification failed: %s",
+            exc,
+        )
+
         raise HTTPException(
             status_code=400,
             detail="Payment signature verification failed.",
@@ -292,7 +306,12 @@ def verify_payment(
             request.razorpay_payment_id
         )
 
-    except Exception:
+    except Exception as exc:
+        logger.exception(
+            "Razorpay payment fetch failed: %s",
+            exc,
+        )
+
         raise HTTPException(
             status_code=502,
             detail="Unable to verify payment with Razorpay.",
@@ -381,16 +400,37 @@ def verify_payment(
     except HTTPException:
         raise
 
-    except Exception:
+    except Exception as exc:
         db.rollback()
+
+        logger.exception(
+            "Paid order processing failed: %s",
+            exc,
+        )
+
         raise HTTPException(
             status_code=500,
             detail="Payment was verified, but order processing failed.",
         )
 
-    # Notify admin through n8n after successful payment and DB commit.
-    send_order_notification(
-        db=db,
-        order=order,
-        order_items=order_items,
-    )
+    # Notify admin after successful payment and database commit.
+    try:
+        send_order_notification(
+            db=db,
+            order=order,
+            order_items=order_items,
+        )
+
+    except Exception as exc:
+        logger.exception(
+            "Order notification failed for order %s: %s",
+            order.id,
+            exc,
+        )
+
+    return {
+        "message": "Payment verified successfully.",
+        "order_id": order.id,
+        "payment_status": order.payment_status,
+        "order_status": order.status,
+    }
