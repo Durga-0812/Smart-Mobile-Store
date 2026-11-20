@@ -1,4 +1,6 @@
 import logging
+import time
+from datetime import datetime
 
 import httpx
 
@@ -14,18 +16,35 @@ def send_order_notification(
     order_items: list[OrderItem],
 ) -> bool:
     """
-    Send a successfully paid order to the n8n webhook.
+    Send a paid order to n8n with bounded retries.
 
-    Webhook failure must never cancel a confirmed order.
+    Notification failures never cancel a confirmed order.
     """
+
+    if order.payment_status != "PAID":
+        logger.warning(
+            "Notification skipped for unpaid order %s",
+            order.id,
+        )
+        return False
+
+    if order.notification_status == "SENT":
+        logger.info(
+            "Notification already sent for order %s",
+            order.id,
+        )
+        return True
 
     webhook_url = settings.N8N_ORDER_WEBHOOK_URL
     webhook_secret = settings.N8N_WEBHOOK_SECRET
 
     if not webhook_url or not webhook_secret:
+        order.notification_status = "FAILED"
+        order.notification_last_error = "n8n webhook is not configured"
+        db.commit()
         logger.warning(
-            "n8n order webhook is not configured. "
-            "Order notification skipped."
+            "n8n webhook is not configured for order %s",
+            order.id,
         )
         return False
 
@@ -37,14 +56,11 @@ def send_order_notification(
         )
 
         if not customer:
-            logger.error(
-                "Customer not found for order %s",
-                order.id,
-            )
-            return False
+            raise ValueError("Customer not found")
 
         payload = {
             "event": "order.paid",
+            "event_id": f"order.paid:{order.id}",
             "order_id": order.id,
             "customer_name": customer.full_name or "Customer",
             "customer_email": customer.email,
@@ -77,34 +93,77 @@ def send_order_notification(
             ),
         }
 
-        response = httpx.post(
-            webhook_url,
-            json=payload,
-            headers={
-                "X-TechLite-Webhook-Secret": webhook_secret,
-            },
-            timeout=5.0,
-        )
+        headers = {
+            "X-TechLite-Webhook-Secret": webhook_secret,
+            "Idempotency-Key": f"order.paid:{order.id}",
+        }
 
-        response.raise_for_status()
+        last_error = None
 
-        logger.info(
-            "n8n order notification accepted for order %s",
-            order.id,
-        )
+        for attempt in range(1, 4):
+            order.notification_attempts = (
+                (order.notification_attempts or 0) + 1
+            )
+            db.commit()
 
-        return True
+            try:
+                response = httpx.post(
+                    webhook_url,
+                    json=payload,
+                    headers=headers,
+                    timeout=8.0,
+                )
+                response.raise_for_status()
 
-    except httpx.HTTPError:
-        logger.exception(
-            "Unable to send n8n notification for order %s",
+                order.notification_status = "SENT"
+                order.notification_last_error = None
+                order.notification_sent_at = datetime.utcnow()
+                db.commit()
+
+                logger.info(
+                    "n8n notification sent for order %s on attempt %s",
+                    order.id,
+                    attempt,
+                )
+                return True
+
+            except httpx.HTTPError as exc:
+                last_error = str(exc)[:1000]
+                logger.warning(
+                    "n8n notification attempt %s failed for order %s",
+                    attempt,
+                    order.id,
+                )
+
+                if attempt < 3:
+                    time.sleep(attempt)
+
+        order.notification_status = "FAILED"
+        order.notification_last_error = last_error or "Unknown webhook error"
+        db.commit()
+
+        logger.error(
+            "All n8n notification attempts failed for order %s",
             order.id,
         )
         return False
 
-    except Exception:
+    except Exception as exc:
+        db.rollback()
+
+        try:
+            order.notification_status = "FAILED"
+            order.notification_last_error = str(exc)[:1000]
+            db.commit()
+        except Exception:
+            db.rollback()
+            logger.exception(
+                "Could not save notification failure for order %s",
+                order.id,
+            )
+
         logger.exception(
-            "Unexpected error sending order notification for %s",
+            "Unexpected error sending n8n notification for order %s",
             order.id,
         )
         return False

@@ -36,6 +36,10 @@ order_columns = {
     "payment_method": "VARCHAR(30)",
     "razorpay_order_id": "VARCHAR(100)",
     "razorpay_payment_id": "VARCHAR(100)",
+    "notification_status": "VARCHAR(30) NOT NULL DEFAULT 'NOT_REQUIRED'",
+    "notification_attempts": "INTEGER NOT NULL DEFAULT 0",
+    "notification_last_error": "TEXT",
+    "notification_sent_at": "TIMESTAMP",
 }
 
 with engine.begin() as connection:

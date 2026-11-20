@@ -84,6 +84,14 @@ class Order(Base):
     razorpay_order_id = Column(String(100), nullable=True, unique=True)
     razorpay_payment_id = Column(String(100), nullable=True, unique=True)
 
+    # Order notification tracking
+    notification_status = Column(
+        String(30), nullable=False, default="NOT_REQUIRED"
+    )
+    notification_attempts = Column(Integer, nullable=False, default=0)
+    notification_last_error = Column(Text, nullable=True)
+    notification_sent_at = Column(DateTime, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     items = relationship(

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
 from app.models import CartItem, Order, OrderItem, Product, User
-from app.security import get_current_user
+from app.security import get_current_user, require_admin
 from app.services.order_webhook import send_order_notification
 
 
@@ -266,14 +266,28 @@ def verify_payment(
             detail="Payment order not found.",
         )
 
-    # Make verification idempotent.
+    # Make verification idempotent and retry failed notifications.
     if order.payment_status == "PAID":
         if order.razorpay_payment_id == request.razorpay_payment_id:
+            if order.notification_status != "SENT":
+                existing_items = (
+                    db.query(OrderItem)
+                    .filter(OrderItem.order_id == order.id)
+                    .all()
+                )
+
+                send_order_notification(
+                    db=db,
+                    order=order,
+                    order_items=existing_items,
+                )
+
             return {
                 "message": "Payment was already verified.",
                 "order_id": order.id,
                 "payment_status": order.payment_status,
                 "order_status": order.status,
+                "notification_status": order.notification_status,
             }
 
         raise HTTPException(
@@ -433,4 +447,100 @@ def verify_payment(
         "order_id": order.id,
         "payment_status": order.payment_status,
         "order_status": order.status,
+    }
+
+@router.get("/notifications/failed")
+def list_failed_notifications(
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(require_admin),
+):
+    """List paid orders whose n8n notifications failed."""
+
+    failed_orders = (
+        db.query(Order)
+        .filter(
+            Order.payment_status == "PAID",
+            Order.notification_status == "FAILED",
+        )
+        .order_by(Order.created_at.desc())
+        .all()
+    )
+
+    return {
+        "count": len(failed_orders),
+        "notifications": [
+            {
+                "order_id": order.id,
+                "customer_id": order.user_id,
+                "total_amount": float(order.total),
+                "notification_status": order.notification_status,
+                "notification_attempts": order.notification_attempts,
+                "notification_last_error": order.notification_last_error,
+                "created_at": (
+                    order.created_at.isoformat()
+                    if order.created_at else None
+                ),
+            }
+            for order in failed_orders
+        ],
+    }
+
+
+@router.post("/notifications/{order_id}/retry")
+def retry_order_notification(
+    order_id: str,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(require_admin),
+):
+    """Manually retry a failed paid-order notification."""
+
+    order = (
+        db.query(Order)
+        .filter(Order.id == order_id)
+        .first()
+    )
+
+    if not order:
+        raise HTTPException(
+            status_code=404,
+            detail="Order not found.",
+        )
+
+    if order.payment_status != "PAID":
+        raise HTTPException(
+            status_code=400,
+            detail="Only successfully paid orders can be notified.",
+        )
+
+    if order.notification_status == "SENT":
+        return {
+            "message": "Notification was already sent.",
+            "order_id": order.id,
+            "notification_status": order.notification_status,
+        }
+
+    order_items = (
+        db.query(OrderItem)
+        .filter(OrderItem.order_id == order.id)
+        .all()
+    )
+
+    success = send_order_notification(
+        db=db,
+        order=order,
+        order_items=order_items,
+    )
+
+    db.refresh(order)
+
+    return {
+        "message": (
+            "Notification sent successfully."
+            if success
+            else "Notification delivery failed. Check the error details."
+        ),
+        "order_id": order.id,
+        "notification_status": order.notification_status,
+        "notification_attempts": order.notification_attempts,
+        "notification_last_error": order.notification_last_error,
     }
