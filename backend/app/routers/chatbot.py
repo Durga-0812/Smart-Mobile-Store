@@ -1049,6 +1049,82 @@ def call_ollama(payload, timeout=180, use_gemini=True):
         )
 
     # ------------------------------------------------
+    # ------------------------------------------------
+    # GROQ CLOUD AI
+    # ------------------------------------------------
+
+    groq_api_key = os.getenv("GROQ_API_KEY", "").strip()
+
+    print("GROQ KEY DETECTED:", bool(groq_api_key), flush=True)
+
+    if groq_api_key and text_only:
+
+        groq_model = os.getenv(
+            "GROQ_MODEL",
+            "openai/gpt-oss-20b"
+        )
+
+        groq_payload = {
+            "model": groq_model,
+            "messages": messages,
+            "temperature": 0.3
+        }
+
+        groq_request = urllib.request.Request(
+            "https://api.groq.com/openai/v1/chat/completions",
+            data=json.dumps(groq_payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {groq_api_key}"
+            },
+            method="POST"
+        )
+
+        try:
+            with urllib.request.urlopen(
+                groq_request,
+                timeout=timeout
+            ) as response:
+
+                result = json.loads(
+                    response.read().decode("utf-8")
+                )
+
+            reply = result["choices"][0]["message"]["content"]
+
+            print("AI PROVIDER: GROQ", flush=True)
+
+            return reply.strip()
+
+        except urllib.error.HTTPError as exc:
+
+            error_body = exc.read().decode(
+                "utf-8",
+                errors="replace"
+            )
+
+            print(
+                f"GROQ HTTP ERROR: {exc.code} {error_body[:1000]}",
+                flush=True
+            )
+
+            raise HTTPException(
+                status_code=502,
+                detail="Groq AI request failed."
+            )
+
+        except (urllib.error.URLError, TimeoutError) as exc:
+
+            print(
+                "GROQ CONNECTION ERROR:",
+                repr(exc),
+                flush=True
+            )
+
+            raise HTTPException(
+                status_code=503,
+                detail="Groq AI is temporarily unavailable."
+            )
     # OLLAMA FALLBACK
     # ------------------------------------------------
 
