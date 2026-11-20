@@ -1075,7 +1075,8 @@ def call_ollama(payload, timeout=180, use_gemini=True):
             data=json.dumps(groq_payload).encode("utf-8"),
             headers={
                 "Content-Type": "application/json",
-                "Authorization": f"Bearer {groq_api_key}"
+                "Authorization": f"Bearer {groq_api_key}",
+                "User-Agent": "TechLiteSmartMobileStore/1.0"
             },
             method="POST"
         )
