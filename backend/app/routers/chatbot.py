@@ -1057,16 +1057,62 @@ def call_ollama(payload, timeout=180, use_gemini=True):
 
     print("GROQ KEY DETECTED:", bool(groq_api_key), flush=True)
 
-    if groq_api_key and text_only:
+    has_images = any(item.get("images") for item in messages)
+
+    if groq_api_key and (text_only or has_images):
 
         groq_model = os.getenv(
-            "GROQ_MODEL",
-            "openai/gpt-oss-20b"
+            "GROQ_VISION_MODEL" if has_images else "GROQ_MODEL",
+            "qwen/qwen3.8-27b" if has_images else "openai/gpt-oss-20b"
         )
+
+        groq_messages = []
+
+        for item in messages:
+            message_content = item.get("content", "")
+            image_list = item.get("images") or []
+
+            if image_list:
+                content_parts = [
+                    {
+                        "type": "text",
+                        "text": str(message_content)
+                    }
+                ]
+
+                for image_data in image_list:
+                    image_bytes = base64.b64decode(image_data)
+
+                    if image_bytes.startswith(b"\x89PNG"):
+                        mime_type = "image/png"
+                    elif image_bytes.startswith(b"RIFF") and image_bytes[8:12] == b"WEBP":
+                        mime_type = "image/webp"
+                    else:
+                        mime_type = "image/jpeg"
+
+                    content_parts.append({
+                        "type": "image_url",
+                        "image_url": {
+                            "url": (
+                                f"data:{mime_type};base64,{image_data}"
+                            )
+                        }
+                    })
+
+                groq_messages.append({
+                    "role": item.get("role", "user"),
+                    "content": content_parts
+                })
+
+            else:
+                groq_messages.append({
+                    "role": item.get("role", "user"),
+                    "content": message_content
+                })
 
         groq_payload = {
             "model": groq_model,
-            "messages": messages,
+            "messages": groq_messages,
             "temperature": 0.3
         }
 
@@ -1093,7 +1139,11 @@ def call_ollama(payload, timeout=180, use_gemini=True):
 
             reply = result["choices"][0]["message"]["content"]
 
-            print("AI PROVIDER: GROQ", flush=True)
+            print(
+                "AI PROVIDER: GROQ",
+                "VISION" if has_images else "TEXT",
+                flush=True
+            )
 
             return reply.strip()
 
@@ -1126,6 +1176,7 @@ def call_ollama(payload, timeout=180, use_gemini=True):
                 status_code=503,
                 detail="Groq AI is temporarily unavailable."
             )
+
     # OLLAMA FALLBACK
     # ------------------------------------------------
 
