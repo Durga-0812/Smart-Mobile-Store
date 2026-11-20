@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from PIL import Image
 from pypdf import PdfReader
+import pymupdf
 
 from app.database import get_db
 from app.models import Product, Order, User
@@ -1829,6 +1830,109 @@ async def upload_file(
                 status_code=400,
                 detail="Unable to read this PDF file."
             )
+
+        # ----------------------------------------------
+        # SCANNED PDF OCR USING GROQ VISION
+        # ----------------------------------------------
+
+        if not document_text.strip():
+
+            try:
+                scanned_pdf = pymupdf.open(
+                    stream=file_bytes,
+                    filetype="pdf"
+                )
+
+                ocr_results = []
+                total_pages = min(len(scanned_pdf), 30)
+
+                for batch_start in range(0, total_pages, 3):
+
+                    batch_images = []
+                    batch_end = min(batch_start + 3, total_pages)
+
+                    for page_index in range(batch_start, batch_end):
+
+                        page = scanned_pdf.load_page(page_index)
+
+                        pixmap = page.get_pixmap(
+                            matrix=pymupdf.Matrix(1.5, 1.5),
+                            alpha=False
+                        )
+
+                        image_data = base64.b64encode(
+                            pixmap.tobytes("png")
+                        ).decode("utf-8")
+
+                        batch_images.append(image_data)
+
+                    ocr_payload = {
+                        "model": os.getenv(
+                            "OLLAMA_VISION_MODEL",
+                            "qwen3-vl:2b"
+                        ),
+                        "stream": False,
+                        "messages": [
+                            {
+                                "role": "system",
+                                "content": (
+                                    "You are a precise OCR assistant. "
+                                    "Read the supplied scanned PDF page images. "
+                                    "Transcribe all readable text accurately, "
+                                    "preserving headings, paragraphs, numbers "
+                                    "and table information where possible. "
+                                    "Label each page clearly. Do not summarize "
+                                    "or invent text. Mark unclear words as "
+                                    "[unclear]."
+                                )
+                            },
+                            {
+                                "role": "user",
+                                "content": (
+                                    f"PDF filename: {filename}. "
+                                    f"Transcribe pages {batch_start + 1} "
+                                    f"to {batch_end} in reading order."
+                                ),
+                                "images": batch_images
+                            }
+                        ],
+                        "options": {
+                            "temperature": 0.1,
+                            "num_predict": 2000
+                        }
+                    }
+
+                    batch_text = call_ollama(
+                        ocr_payload,
+                        timeout=300,
+                        use_gemini=False
+                    )
+
+                    ocr_results.append(
+                        f"Pages {batch_start + 1}-{batch_end}:\n{batch_text}"
+                    )
+
+                scanned_pdf.close()
+
+                document_text = "\n\n".join(ocr_results)
+
+                print(
+                    "SCANNED PDF OCR COMPLETED:",
+                    total_pages,
+                    "pages",
+                    flush=True
+                )
+
+            except HTTPException:
+                raise
+
+            except Exception as exc:
+                print("SCANNED PDF OCR ERROR:", repr(exc), flush=True)
+
+                raise HTTPException(
+                    status_code=422,
+                    detail="Unable to extract text from this scanned PDF."
+                )
 
         if not document_text.strip():
             raise HTTPException(
