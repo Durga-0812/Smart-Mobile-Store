@@ -137,6 +137,9 @@ export default function AdminDashboard({ fullName, onLogout }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [failedNotifications, setFailedNotifications] = useState([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [retryingOrderId, setRetryingOrderId] = useState(null);
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -222,6 +225,71 @@ export default function AdminDashboard({ fullName, onLogout }) {
     loadData();
   }, []);
 
+  async function loadFailedNotifications() {
+    setNotificationsLoading(true);
+
+    try {
+      const response = await fetch(
+        `${API}/payments/notifications/failed`,
+        {
+          headers: {
+            Authorization: `Bearer ${token()}`,
+          },
+        }
+      );
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(
+          data?.detail || "Unable to load failed notifications."
+        );
+      }
+
+      setFailedNotifications(
+        Array.isArray(data?.notifications)
+          ? data.notifications
+          : []
+      );
+    } catch (err) {
+      setError(err.message || "Unable to load notifications.");
+    } finally {
+      setNotificationsLoading(false);
+    }
+  }
+
+  async function retryNotification(orderId) {
+    setRetryingOrderId(orderId);
+    setError("");
+    setNotice("");
+
+    try {
+      const response = await fetch(
+        `${API}/payments/notifications/${encodeURIComponent(orderId)}/retry`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token()}`,
+          },
+        }
+      );
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(
+          data?.detail || "Unable to retry notification."
+        );
+      }
+
+      setNotice(data?.message || "Retry request completed.");
+      await loadFailedNotifications();
+    } catch (err) {
+      setError(err.message || "Unable to retry notification.");
+    } finally {
+      setRetryingOrderId(null);
+    }
+  }
   function openAddForm() {
     setEditingId(null);
     setForm({ ...emptyProduct });
@@ -625,6 +693,7 @@ export default function AdminDashboard({ fullName, onLogout }) {
     ["Products", "⬡"],
     ["Customers", "♟"],
     ["Messages", "✉"],
+    ["Notifications", "🔔"],
     ["Settings", "⚙"],
   ];
 
@@ -675,6 +744,10 @@ export default function AdminDashboard({ fullName, onLogout }) {
                 setShowForm(false);
                 setError("");
                 setNotice("");
+
+                if (label === "Notifications") {
+                  loadFailedNotifications();
+                }
               }}
             >
               <span>{symbol}</span>
@@ -1577,7 +1650,76 @@ export default function AdminDashboard({ fullName, onLogout }) {
                     </button>
                   </div>
                 </div>
-              ) : section === "Messages" ? (
+              ) : section === "Notifications" ? (
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                    <h2>Failed Order Notifications</h2>
+                    <button
+                      type="button"
+                      className="admin-add-button"
+                      onClick={loadFailedNotifications}
+                      disabled={notificationsLoading}
+                    >
+                      {notificationsLoading ? "Loading..." : "Refresh"}
+                    </button>
+                  </div>
+
+                  <p>View failed order notifications and retry sending them.</p>
+
+                  {notificationsLoading ? (
+                    <p>Loading failed notifications...</p>
+                  ) : failedNotifications.length === 0 ? (
+                    <p>No failed order notifications found.</p>
+                  ) : (
+                    <div className="admin-table-wrapper">
+                      <table className="admin-table">
+                        <thead>
+                          <tr>
+                            <th>Order ID</th>
+                            <th>Customer ID</th>
+                            <th>Amount</th>
+                            <th>Attempts</th>
+                            <th>Last Error</th>
+                            <th>Created</th>
+                            <th>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {failedNotifications.map((item) => (
+                            <tr key={item.order_id}>
+                              <td>{item.order_id}</td>
+                              <td>{item.customer_id ?? "—"}</td>
+                              <td>
+                                {item.total_amount != null
+                                  ? `₹${Number(item.total_amount).toFixed(2)}`
+                                  : "—"}
+                              </td>
+                              <td>{item.notification_attempts ?? 0}</td>
+                              <td>{item.notification_last_error || "—"}</td>
+                              <td>
+                                {item.created_at
+                                  ? new Date(item.created_at).toLocaleString()
+                                  : "—"}
+                              </td>
+                              <td>
+                                <button
+                                  type="button"
+                                  className="admin-add-button"
+                                  disabled={retryingOrderId === item.order_id}
+                                  onClick={() => retryNotification(item.order_id)}
+                                >
+                                  {retryingOrderId === item.order_id
+                                    ? "Retrying..."
+                                    : "Retry"}
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>              ) : section === "Messages" ? (
                 <AdminMessages />
               ) : null}
             </section>
