@@ -1,3 +1,4 @@
+
 import logging
 import time
 from datetime import datetime
@@ -5,7 +6,7 @@ from datetime import datetime
 import httpx
 
 from app.config import settings
-from app.models import Order, OrderItem, User
+from app.models import Order, OrderItem, User, Product
 
 logger = logging.getLogger(__name__)
 
@@ -15,24 +16,14 @@ def send_order_notification(
     order: Order,
     order_items: list[OrderItem],
 ) -> bool:
-    """
-    Send a paid order to n8n with bounded retries.
-
-    Notification failures never cancel a confirmed order.
-    """
+    """Send a paid order to n8n with bounded retries."""
 
     if order.payment_status != "PAID":
-        logger.warning(
-            "Notification skipped for unpaid order %s",
-            order.id,
-        )
+        logger.warning("Notification skipped for unpaid order %s", order.id)
         return False
 
     if order.notification_status == "SENT":
-        logger.info(
-            "Notification already sent for order %s",
-            order.id,
-        )
+        logger.info("Notification already sent for order %s", order.id)
         return True
 
     webhook_url = settings.N8N_ORDER_WEBHOOK_URL
@@ -42,18 +33,11 @@ def send_order_notification(
         order.notification_status = "FAILED"
         order.notification_last_error = "n8n webhook is not configured"
         db.commit()
-        logger.warning(
-            "n8n webhook is not configured for order %s",
-            order.id,
-        )
+        logger.warning("n8n webhook is not configured for order %s", order.id)
         return False
 
     try:
-        customer = (
-            db.query(User)
-            .filter(User.id == order.user_id)
-            .first()
-        )
+        customer = db.query(User).filter(User.id == order.user_id).first()
 
         if not customer:
             raise ValueError("Customer not found")
@@ -142,10 +126,7 @@ def send_order_notification(
         order.notification_last_error = last_error or "Unknown webhook error"
         db.commit()
 
-        logger.error(
-            "All n8n notification attempts failed for order %s",
-            order.id,
-        )
+        logger.error("All n8n notification attempts failed for order %s", order.id)
         return False
 
     except Exception as exc:
@@ -162,8 +143,85 @@ def send_order_notification(
                 order.id,
             )
 
-        logger.exception(
-            "Unexpected error sending n8n notification for order %s",
-            order.id,
-        )
+        logger.exception("Unexpected error sending n8n notification for order %s", order.id)
         return False
+
+
+def send_stock_update(
+    db,
+    order: Order,
+    order_items: list[OrderItem],
+) -> bool:
+    """
+    Send the actual remaining database stock to n8n.
+
+    The backend has already deducted stock after successful payment.
+    This function only synchronises the current quantity to Google Sheets.
+    """
+
+    if order.payment_status != "PAID":
+        return False
+
+    webhook_url = settings.N8N_STOCK_UPDATE_WEBHOOK_URL
+    webhook_secret = settings.N8N_WEBHOOK_SECRET
+
+    if not webhook_url or not webhook_secret:
+        logger.warning("Stock update webhook is not configured")
+        return False
+
+    headers = {
+        "X-TechLite-Webhook-Secret": webhook_secret,
+    }
+
+    all_successful = True
+
+    for item in order_items:
+        product = (
+            db.query(Product)
+            .filter(Product.id == item.product_id)
+            .first()
+        )
+
+        if not product:
+            logger.warning("Product %s not found for stock sync", item.product_id)
+            all_successful = False
+            continue
+
+        payload = {
+            "event": "product.stock_updated",
+            "event_id": f"stock.updated:{order.id}:{product.id}",
+            "order_id": order.id,
+            "product_id": product.id,
+            "product_name": product.name,
+            "stock_quantity": product.stock_quantity,
+        }
+
+        headers["Idempotency-Key"] = (
+            f"stock.updated:{order.id}:{product.id}"
+        )
+
+        try:
+            response = httpx.post(
+                webhook_url,
+                json=payload,
+                headers=headers,
+                timeout=8.0,
+            )
+            response.raise_for_status()
+
+            logger.info(
+                "Stock synced for product %s: %s",
+                product.id,
+                product.stock_quantity,
+            )
+
+        except httpx.HTTPError:
+            all_successful = False
+            logger.exception(
+                "Stock sync failed for product %s",
+                product.id,
+            )
+
+        time.sleep(0.2)
+
+    return all_successful

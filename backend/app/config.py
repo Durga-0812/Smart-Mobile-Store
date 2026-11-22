@@ -1,4 +1,5 @@
-﻿from pathlib import Path
+﻿
+from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -24,8 +25,14 @@ class Settings(BaseSettings):
     RAZORPAY_KEY_ID: str = ""
     RAZORPAY_KEY_SECRET: str = ""
     RAZORPAY_CURRENCY: str = "INR"
+
     # n8n Order Email Webhook
     N8N_ORDER_WEBHOOK_URL: str = ""
+
+    # n8n Google Sheets Stock Update Webhook
+    N8N_STOCK_UPDATE_WEBHOOK_URL: str = ""
+
+    # Shared n8n Webhook Secret
     N8N_WEBHOOK_SECRET: str = ""
 
     model_config = SettingsConfigDict(

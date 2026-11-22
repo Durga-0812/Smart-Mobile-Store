@@ -10,7 +10,10 @@ from app.config import settings
 from app.database import get_db
 from app.models import CartItem, Order, OrderItem, Product, User
 from app.security import get_current_user, require_admin
-from app.services.order_webhook import send_order_notification
+from app.services.order_webhook import (
+    send_order_notification,
+    send_stock_update,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -442,12 +445,28 @@ def verify_payment(
             exc,
         )
 
+    # Synchronise current stock with Google Sheets.
+    try:
+        send_stock_update(
+            db=db,
+            order=order,
+            order_items=order_items,
+        )
+
+    except Exception as exc:
+        logger.exception(
+            "Stock synchronisation failed for order %s: %s",
+            order.id,
+            exc,
+        )
+
     return {
         "message": "Payment verified successfully.",
         "order_id": order.id,
         "payment_status": order.payment_status,
         "order_status": order.status,
     }
+
 
 @router.get("/notifications/failed")
 def list_failed_notifications(
