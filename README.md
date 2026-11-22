@@ -474,3 +474,11 @@ The objective of TechLite is to develop a complete e-commerce application that c
 
 ⭐ If you find this project interesting, consider giving the repository a star!
 
+
+## 📸 Project Screenshots
+
+### TechLite Homepage
+
+![TechLite Homepage](screenshots/homepage.png)
+
+
