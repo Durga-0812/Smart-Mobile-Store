@@ -28,7 +28,7 @@ def create_product(
             detail="Product image URL is required"
         )
 
-    product = Product(**product_data)
+    product = Product(**product_data, is_archived=False)
 
     db.add(product)
     db.flush()
@@ -52,20 +52,103 @@ def create_product(
     return product
 
 
-# READ: Get all products
+# READ: Get active products for customers
 @router.get("/", response_model=list[ProductResponse])
 def get_products(db: Session = Depends(get_db)):
-    return db.query(Product).all()
+    return db.query(Product).filter(
+        Product.is_archived.is_(False)
+    ).all()
 
 
-# READ: Get one product
+# READ: Get all products for admin
+# Keep this route before /{product_id}
+@router.get("/admin/all", response_model=list[ProductResponse])
+def get_all_products(
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin)
+):
+    return db.query(Product).order_by(
+        Product.created_at.desc()
+    ).all()
+
+
+# ARCHIVE: Hide a product without deleting its order history
+@router.post("/{product_id}/archive")
+def archive_product(
+    product_id: str,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin)
+):
+    product = db.query(Product).filter(
+        Product.id == product_id
+    ).first()
+
+    if product is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Product not found"
+        )
+
+    if product.is_archived:
+        raise HTTPException(
+            status_code=400,
+            detail="Product is already archived."
+        )
+
+    product.is_archived = True
+
+    # Remove this product from customer carts
+    db.query(CartItem).filter(
+        CartItem.product_id == product_id
+    ).delete(synchronize_session=False)
+
+    db.commit()
+
+    return {
+        "message": f"{product.name} archived successfully."
+    }
+
+
+# RESTORE: Make an archived product available again
+@router.post("/{product_id}/restore")
+def restore_product(
+    product_id: str,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin)
+):
+    product = db.query(Product).filter(
+        Product.id == product_id
+    ).first()
+
+    if product is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Product not found"
+        )
+
+    if not product.is_archived:
+        raise HTTPException(
+            status_code=400,
+            detail="Product is already active."
+        )
+
+    product.is_archived = False
+    db.commit()
+
+    return {
+        "message": f"{product.name} restored successfully."
+    }
+
+
+# READ: Get one active product
 @router.get("/{product_id}", response_model=ProductResponse)
 def get_product(
     product_id: str,
     db: Session = Depends(get_db)
 ):
     product = db.query(Product).filter(
-        Product.id == product_id
+        Product.id == product_id,
+        Product.is_archived.is_(False)
     ).first()
 
     if product is None:
@@ -96,7 +179,6 @@ def update_product(
         )
 
     changes = data.model_dump(exclude_unset=True)
-
     previous_stock = product.stock_quantity
 
     for field, value in changes.items():
@@ -125,7 +207,7 @@ def update_product(
     return product
 
 
-# DELETE: Delete a product (admin only)
+# DELETE: Permanently delete only products without order history
 @router.delete("/{product_id}")
 def delete_product(
     product_id: str,
@@ -142,7 +224,6 @@ def delete_product(
             detail="Product not found"
         )
 
-    # Protect existing order history
     existing_order = db.query(OrderItem).filter(
         OrderItem.product_id == product_id
     ).first()
@@ -150,10 +231,9 @@ def delete_product(
     if existing_order:
         raise HTTPException(
             status_code=409,
-            detail="This product is linked to an existing order and cannot be deleted."
+            detail="This product has order history. Archive it instead."
         )
 
-    # Remove cart references before deleting the product
     db.query(CartItem).filter(
         CartItem.product_id == product_id
     ).delete(synchronize_session=False)

@@ -71,6 +71,7 @@ class ProductResponse(BaseModel):
     stock_quantity: int
     category: str
     image_url: Optional[str] = None
+    is_archived: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 

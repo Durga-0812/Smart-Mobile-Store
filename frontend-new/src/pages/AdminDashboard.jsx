@@ -171,7 +171,7 @@ export default function AdminDashboard({ fullName, onLogout }) {
         customerResponse,
         analyticsResponse,
       ] = await Promise.all([
-        fetch(`${API}/products/`),
+        fetch(`${API}/products/admin/all`, { headers: { Authorization: `Bearer ${token()}` } }),
 
         fetch(`${API}/auth/admin/users`, {
           headers: {
@@ -752,6 +752,73 @@ export default function AdminDashboard({ fullName, onLogout }) {
     }
   }
 
+  async function archiveProduct(product) {
+    const confirmed = window.confirm(
+      `Archive "${product.name}"? It will no longer appear in the customer store.`
+    );
+
+    if (!confirmed) return;
+
+    setError("");
+    setNotice("");
+
+    try {
+      const response = await fetch(
+        `${API}/products/${product.id}/archive`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token()}`,
+          },
+        }
+      );
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(data?.detail || "Unable to archive product.");
+      }
+
+      setNotice(data?.message || "Product archived successfully.");
+      await loadData();
+    } catch (err) {
+      setError(err.message || "Unable to archive product.");
+    }
+  }
+
+  async function restoreProduct(product) {
+    const confirmed = window.confirm(
+      `Restore "${product.name}" to the customer store?`
+    );
+
+    if (!confirmed) return;
+
+    setError("");
+    setNotice("");
+
+    try {
+      const response = await fetch(
+        `${API}/products/${product.id}/restore`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token()}`,
+          },
+        }
+      );
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(data?.detail || "Unable to restore product.");
+      }
+
+      setNotice(data?.message || "Product restored successfully.");
+      await loadData();
+    } catch (err) {
+      setError(err.message || "Unable to restore product.");
+    }
+  }
   async function deleteProduct(product) {
     const confirmed = window.confirm(
       `Are you sure you want to delete "${product.name}"?`
@@ -796,6 +863,7 @@ export default function AdminDashboard({ fullName, onLogout }) {
     ["Orders", "🛒"],
     ["Categories", "☷"],
     ["Products", "⬡"],
+    ["Archived Products", "▣"],
     ["Customers", "♟"],
     ["Messages", "✉"],
     ["Feedback", "⭐"],
@@ -803,10 +871,20 @@ export default function AdminDashboard({ fullName, onLogout }) {
     ["Settings", "⚙"],
   ];
 
+  const activeProducts = products.filter(
+    (product) => !product.is_archived
+  );
+
+  const archivedProducts = products.filter(
+    (product) => product.is_archived
+  );
+
+  const displayedProducts =
+    section === "Archived Products" ? archivedProducts : activeProducts;
   const categorySummaries = PRODUCT_CATEGORIES.map(
     (category) => ({
       ...category,
-      productCount: products.filter(
+      productCount: activeProducts.filter(
         (product) =>
           getCategoryId(product.category) === category.id
       ).length,
@@ -906,7 +984,7 @@ export default function AdminDashboard({ fullName, onLogout }) {
                 <span className="stat-icon">▣</span>
                 <div>
                   <p>Total Products</p>
-                  <strong>{products.length}</strong>
+                  <strong>{activeProducts.length}</strong>
                 </div>
               </article>
 
@@ -924,7 +1002,7 @@ export default function AdminDashboard({ fullName, onLogout }) {
                   <p>Inventory Value</p>
                   <strong>
                     ₹
-                    {products
+                    {activeProducts
                       .reduce(
                         (sum, item) =>
                           sum +
@@ -1559,12 +1637,13 @@ export default function AdminDashboard({ fullName, onLogout }) {
                 </form>
               )}
 
-              {/* Products and Dashboard Product Overview */}
-              {section === "Dashboard" ||
-              section === "Products" ? (
-                products.length === 0 ? (
+              {/* Products, Archived Products and Dashboard Overview */}
+              {["Dashboard", "Products", "Archived Products"].includes(section) ? (
+                displayedProducts.length === 0 ? (
                   <p>
-                    No products found in the database.
+                    {section === "Archived Products"
+                      ? "No archived products found."
+                      : "No active products found in the database."}
                   </p>
                 ) : (
                   <div className="admin-table-wrapper">
@@ -1576,15 +1655,12 @@ export default function AdminDashboard({ fullName, onLogout }) {
                           <th>Category</th>
                           <th>Price</th>
                           <th>Stock</th>
-
-                          {section === "Products" && (
-                            <th>Actions</th>
-                          )}
+                          {section !== "Dashboard" && <th>Actions</th>}
                         </tr>
                       </thead>
 
                       <tbody>
-                        {products.map((product) => (
+                        {displayedProducts.map((product) => (
                           <tr key={product.id}>
                             <td>
                               {product.image_url ? (
@@ -1599,8 +1675,7 @@ export default function AdminDashboard({ fullName, onLogout }) {
                                     borderRadius: "6px",
                                   }}
                                   onError={(event) => {
-                                    event.currentTarget.style.display =
-                                      "none";
+                                    event.currentTarget.style.display = "none";
                                   }}
                                 />
                               ) : (
@@ -1610,44 +1685,53 @@ export default function AdminDashboard({ fullName, onLogout }) {
 
                             <td>{product.name}</td>
 
-                            <td>
-                              {getCategoryName(
-                                product.category
-                              )}
-                            </td>
+                            <td>{getCategoryName(product.category)}</td>
 
                             <td>
-                              ₹
-                              {Number(
-                                product.price || 0
-                              ).toLocaleString("en-IN")}
+                              ₹{Number(product.price || 0).toLocaleString("en-IN")}
                             </td>
 
-                            <td>
-                              {product.stock_quantity ?? "—"}
-                            </td>
+                            <td>{product.stock_quantity ?? "—"}</td>
 
                             {section === "Products" && (
                               <td>
                                 <div className="product-row-actions">
                                   <button
                                     type="button"
-                                    onClick={() =>
-                                      openEditForm(product)
-                                    }
+                                    onClick={() => openEditForm(product)}
                                   >
                                     Edit
                                   </button>
 
                                   <button
                                     type="button"
+                                    onClick={() => archiveProduct(product)}
+                                    disabled={bulkUploading}
+                                  >
+                                    Archive
+                                  </button>
+
+                                  <button
+                                    type="button"
                                     className="delete-button"
-                                    onClick={() =>
-                                      deleteProduct(product)
-                                    }
+                                    onClick={() => deleteProduct(product)}
                                     disabled={bulkUploading}
                                   >
                                     Delete
+                                  </button>
+                                </div>
+                              </td>
+                            )}
+
+                            {section === "Archived Products" && (
+                              <td>
+                                <div className="product-row-actions">
+                                  <button
+                                    type="button"
+                                    onClick={() => restoreProduct(product)}
+                                    disabled={bulkUploading}
+                                  >
+                                    Restore
                                   </button>
                                 </div>
                               </td>

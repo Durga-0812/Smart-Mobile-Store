@@ -1415,7 +1415,7 @@ def chat_with_ai(
     # LOAD PRODUCTS
     # ------------------------------------------------
 
-    products = db.query(Product).all()
+    products = db.query(Product).filter(Product.is_archived.is_(False)).all()
 
     normalized_question = normalize_text(message)
 

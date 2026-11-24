@@ -13,10 +13,14 @@ def serialize_cart(db: Session, user_id: str) -> dict:
     rows = (
         db.query(CartItem, Product)
         .join(Product, CartItem.product_id == Product.id)
-        .filter(CartItem.user_id == user_id)
+        .filter(
+            CartItem.user_id == user_id,
+            Product.is_archived.is_(False),
+        )
         .order_by(Product.name)
         .all()
     )
+
     items = [
         {
             "id": product.id,
@@ -29,6 +33,7 @@ def serialize_cart(db: Session, user_id: str) -> dict:
         }
         for cart_item, product in rows
     ]
+
     return {
         "items": items,
         "total_items": sum(item["quantity"] for item in items),
@@ -51,12 +56,19 @@ def add_cart_item(
 ):
     product = (
         db.query(Product)
-        .filter(Product.id == payload.product_id)
+        .filter(
+            Product.id == payload.product_id,
+            Product.is_archived.is_(False),
+        )
         .with_for_update()
         .first()
     )
+
     if product is None:
-        raise HTTPException(status_code=404, detail="Product not found.")
+        raise HTTPException(
+            status_code=404,
+            detail="Product not found or is no longer available.",
+        )
 
     cart_item = (
         db.query(CartItem)
@@ -67,6 +79,7 @@ def add_cart_item(
         .with_for_update()
         .first()
     )
+
     new_quantity = (cart_item.quantity if cart_item else 0) + payload.quantity
 
     if new_quantity > 100:
@@ -74,6 +87,7 @@ def add_cart_item(
             status_code=400,
             detail="Maximum quantity per product is 100.",
         )
+
     if new_quantity > product.stock_quantity:
         raise HTTPException(
             status_code=400,
@@ -102,9 +116,17 @@ def update_cart_item(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    product = db.query(Product).filter(Product.id == product_id).first()
+    product = db.query(Product).filter(
+        Product.id == product_id,
+        Product.is_archived.is_(False),
+    ).first()
+
     if product is None:
-        raise HTTPException(status_code=404, detail="Product not found.")
+        raise HTTPException(
+            status_code=404,
+            detail="Product not found or is no longer available.",
+        )
+
     if payload.quantity > product.stock_quantity:
         raise HTTPException(
             status_code=400,
@@ -119,11 +141,13 @@ def update_cart_item(
         )
         .first()
     )
+
     if cart_item is None:
         raise HTTPException(status_code=404, detail="Cart item not found.")
 
     cart_item.quantity = payload.quantity
     db.commit()
+
     return serialize_cart(db, current_user.id)
 
 
@@ -137,6 +161,7 @@ def remove_cart_item(
         CartItem.user_id == current_user.id,
         CartItem.product_id == product_id,
     ).delete(synchronize_session=False)
+
     db.commit()
     return serialize_cart(db, current_user.id)
 
@@ -146,8 +171,9 @@ def clear_cart(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    db.query(CartItem).filter(CartItem.user_id == current_user.id).delete(
-        synchronize_session=False
-    )
+    db.query(CartItem).filter(
+        CartItem.user_id == current_user.id
+    ).delete(synchronize_session=False)
+
     db.commit()
     return serialize_cart(db, current_user.id)

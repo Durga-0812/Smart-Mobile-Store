@@ -45,8 +45,8 @@ class Product(Base):
     stock_quantity = Column(Integer, default=0, nullable=False)
     category = Column(String(100), nullable=False)
     image_url = Column(String(500), nullable=False)
+    is_archived = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
-
 
 class CartItem(Base):
     __tablename__ = "cart_items"

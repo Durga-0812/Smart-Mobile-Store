@@ -110,6 +110,12 @@ def create_order(
                     detail=f"Product {product_id} was not found.",
                 )
 
+            if product.is_archived:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"{product.name} is no longer available for purchase.",
+                )
+
             if product.stock_quantity < quantity:
                 raise HTTPException(
                     status_code=400,
@@ -118,7 +124,6 @@ def create_order(
                         f"Available: {product.stock_quantity}."
                     ),
                 )
-
             unit_price = money(Decimal(str(product.price)))
             line_total = money(unit_price * quantity)
             subtotal += line_total
