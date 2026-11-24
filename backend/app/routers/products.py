@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import CartItem, Product, OrderItem
+from app.models import CartItem, Product, OrderItem, Feedback
 from app.schemas import ProductCreate, ProductUpdate, ProductResponse
 from app.security import require_admin
 from app.services.admin_notifications import create_admin_notification
@@ -207,7 +207,7 @@ def update_product(
     return product
 
 
-# DELETE: Permanently delete only products without order history
+# DELETE: Permanently delete a product, preserving order history
 @router.delete("/{product_id}")
 def delete_product(
     product_id: str,
@@ -224,23 +224,38 @@ def delete_product(
             detail="Product not found"
         )
 
-    existing_order = db.query(OrderItem).filter(
-        OrderItem.product_id == product_id
-    ).first()
-
-    if existing_order:
-        raise HTTPException(
-            status_code=409,
-            detail="This product has order history. Archive it instead."
+    try:
+        # Preserve historical order details but remove product reference
+        db.query(OrderItem).filter(
+            OrderItem.product_id == product_id
+        ).update(
+            {OrderItem.product_id: None},
+            synchronize_session=False
         )
 
-    db.query(CartItem).filter(
-        CartItem.product_id == product_id
-    ).delete(synchronize_session=False)
+        # Preserve feedback but detach it from the deleted product
+        db.query(Feedback).filter(
+            Feedback.product_id == product_id
+        ).update(
+            {Feedback.product_id: None},
+            synchronize_session=False
+        )
 
-    db.delete(product)
-    db.commit()
+        # Remove product from customer carts
+        db.query(CartItem).filter(
+            CartItem.product_id == product_id
+        ).delete(synchronize_session=False)
 
-    return {
-        "message": "Product deleted successfully"
-    }
+        db.delete(product)
+        db.commit()
+
+        return {
+            "message": "Product deleted successfully."
+        }
+
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to delete product."
+        )

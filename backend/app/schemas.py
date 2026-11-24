@@ -95,7 +95,7 @@ class OrderCreate(BaseModel):
 
 class OrderItemResponse(BaseModel):
     id: str
-    product_id: str
+    product_id: str | None = None
     product_name: str
     unit_price: Decimal
     quantity: int
