@@ -11,6 +11,7 @@ from app.database import get_db
 from app.models import StoreMessage, User
 from app.schemas import MessageCreate, MessageResponse
 from app.security import require_admin
+from app.services.admin_notifications import create_admin_notification
 
 
 router = APIRouter(
@@ -41,6 +42,20 @@ def create_message(
     )
 
     db.add(new_message)
+    db.flush()
+
+    create_admin_notification(
+        db=db,
+        notification_type="MESSAGE",
+        title="New Contact Message",
+        message=(
+            f"{new_message.name} sent a message: "
+            f"{new_message.subject}"
+        ),
+        related_type="MESSAGE",
+        related_id=new_message.id,
+    )
+
     db.commit()
     db.refresh(new_message)
 

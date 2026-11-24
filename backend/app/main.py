@@ -8,7 +8,6 @@ from app.config import settings
 from app.database import SessionLocal
 from app.models import User
 from app.security import hash_password
-from pathlib import Path
 
 from fastapi import FastAPI
 from sqlalchemy import inspect, text
@@ -18,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.database import Base, engine
 from app import models
-from app.routers import auth, products, orders, cart, messages,chatbot,analytics,payments
+from app.routers import auth, products, orders, cart, messages, chatbot, analytics, payments, notifications, feedback
 
 Base.metadata.create_all(bind=engine)
 
@@ -36,10 +35,6 @@ order_columns = {
     "payment_method": "VARCHAR(30)",
     "razorpay_order_id": "VARCHAR(100)",
     "razorpay_payment_id": "VARCHAR(100)",
-    "notification_status": "VARCHAR(30) NOT NULL DEFAULT 'NOT_REQUIRED'",
-    "notification_attempts": "INTEGER NOT NULL DEFAULT 0",
-    "notification_last_error": "TEXT",
-    "notification_sent_at": "TIMESTAMP",
 }
 
 with engine.begin() as connection:
@@ -96,6 +91,8 @@ app.include_router(messages.router)
 app.include_router(chatbot.router)
 app.include_router(analytics.router)
 app.include_router(payments.router)
+app.include_router(notifications.router)
+app.include_router(feedback.router)
 
 # React frontend production files
 FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend-new" / "dist"

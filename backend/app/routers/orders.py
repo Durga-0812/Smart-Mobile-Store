@@ -1,12 +1,25 @@
-
 from decimal import Decimal, ROUND_HALF_UP
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.database import get_db
-from app.models import CartItem, Order, OrderItem, Product, User
-from app.schemas import OrderCreate, OrderResponse, OrderStatusUpdate
+from app.models import (
+    CartItem,
+    Order,
+    OrderItem,
+    OrderStatusHistory,
+    Product,
+    User,
+)
+from app.services.admin_notifications import create_admin_notification
+
+from app.schemas import (
+    OrderCreate,
+    OrderResponse,
+    OrderStatusUpdate,
+    OrderTrackingResponse,
+)
 from app.security import get_current_user, require_admin
 
 router = APIRouter(prefix="/api/v1/orders", tags=["Orders"])
@@ -44,21 +57,40 @@ def calculate_discount(subtotal: Decimal, coupon_code: str | None) -> Decimal:
     raise HTTPException(status_code=400, detail="Invalid coupon code.")
 
 
+def get_status_description(status_value: str) -> str:
+    descriptions = {
+        "PENDING": "Your order has been placed successfully.",
+        "CONFIRMED": "Your order has been confirmed.",
+        "PROCESSING": "Your order is being prepared.",
+        "SHIPPED": "Your order has been shipped.",
+        "DELIVERED": "Your order has been delivered successfully.",
+        "CANCELLED": "Your order has been cancelled.",
+    }
+
+    return descriptions.get(
+        status_value,
+        f"Your order status has been updated to {status_value}.",
+    )
+
+
 @router.post("/", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
 def create_order(
     payload: OrderCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # Combine duplicate product IDs and validate quantities.
     quantities: dict[str, int] = {}
+
     for item in payload.items:
         quantities[item.product_id] = (
             quantities.get(item.product_id, 0) + item.quantity
         )
 
     if any(quantity > 100 for quantity in quantities.values()):
-        raise HTTPException(status_code=400, detail="Maximum quantity per product is 100.")
+        raise HTTPException(
+            status_code=400,
+            detail="Maximum quantity per product is 100.",
+        )
 
     try:
         subtotal = ZERO
@@ -81,7 +113,10 @@ def create_order(
             if product.stock_quantity < quantity:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Insufficient stock for {product.name}. Available: {product.stock_quantity}.",
+                    detail=(
+                        f"Insufficient stock for {product.name}. "
+                        f"Available: {product.stock_quantity}."
+                    ),
                 )
 
             unit_price = money(Decimal(str(product.price)))
@@ -100,33 +135,75 @@ def create_order(
 
         subtotal = money(subtotal)
         discount = calculate_discount(subtotal, payload.coupon_code)
+
         discounted_subtotal = max(ZERO, subtotal - discount)
         tax = money(discounted_subtotal * TAX_RATE)
-        shipping = ZERO if subtotal >= FREE_SHIPPING_LIMIT else SHIPPING_CHARGE
+
+        shipping = (
+            ZERO
+            if subtotal >= FREE_SHIPPING_LIMIT
+            else SHIPPING_CHARGE
+        )
+
         total = money(discounted_subtotal + tax + shipping)
 
         order = Order(
-    user_id=current_user.id,
-    status="PENDING",
-    subtotal=subtotal,
-    discount=discount,
-    tax=tax,
-    shipping=shipping,
-    total=total,
-    delivery_address=(
-        payload.delivery_address.strip()
-        if payload.delivery_address and payload.delivery_address.strip()
-        else None
-    ),
-    delivery_latitude=payload.delivery_latitude,
-    delivery_longitude=payload.delivery_longitude,
-)
+            user_id=current_user.id,
+            status="PENDING",
+            subtotal=subtotal,
+            discount=discount,
+            tax=tax,
+            shipping=shipping,
+            total=total,
+            delivery_address=(
+                payload.delivery_address.strip()
+                if payload.delivery_address
+                and payload.delivery_address.strip()
+                else None
+            ),
+            delivery_latitude=payload.delivery_latitude,
+            delivery_longitude=payload.delivery_longitude,
+        )
+
         db.add(order)
         db.flush()
 
+        create_admin_notification(
+            db=db,
+            notification_type="ORDER",
+            title="New Order Placed",
+            message=f"New order {order.id} was placed by {current_user.email}.",
+            related_type="ORDER",
+            related_id=order.id,
+        )
+
+        # Record the initial order status.
+        db.add(
+            OrderStatusHistory(
+                order_id=order.id,
+                status="PENDING",
+                description=get_status_description("PENDING"),
+                updated_by=current_user.id,
+            )
+        )
+
         for item in order_items:
             product = item["product"]
+            previous_stock = product.stock_quantity
             product.stock_quantity -= item["quantity"]
+
+            if previous_stock > 5 and product.stock_quantity <= 5:
+                create_admin_notification(
+                    db=db,
+                    notification_type="LOW_STOCK",
+                    title="Low Product Stock",
+                    message=(
+                        f"{product.name} has only "
+                        f"{product.stock_quantity} units remaining."
+                    ),
+                    related_type="PRODUCT",
+                    related_id=product.id,
+                )
 
             db.add(
                 OrderItem(
@@ -142,6 +219,7 @@ def create_order(
         db.query(CartItem).filter(
             CartItem.user_id == current_user.id
         ).delete(synchronize_session=False)
+
         db.commit()
 
         created_order = (
@@ -150,6 +228,7 @@ def create_order(
             .filter(Order.id == order.id)
             .first()
         )
+
         return created_order
 
     except Exception:
@@ -198,10 +277,16 @@ def get_order(
     )
 
     if order is None:
-        raise HTTPException(status_code=404, detail="Order not found.")
+        raise HTTPException(
+            status_code=404,
+            detail="Order not found.",
+        )
 
     if order.user_id != current_user.id and current_user.role != "ADMIN":
-        raise HTTPException(status_code=403, detail="You cannot access this order.")
+        raise HTTPException(
+            status_code=403,
+            detail="You cannot access this order.",
+        )
 
     return order
 
@@ -223,10 +308,14 @@ def update_order_status(
     }
 
     new_status = payload.status.strip().upper()
+
     if new_status not in allowed_statuses:
         raise HTTPException(
             status_code=400,
-            detail=f"Status must be one of: {', '.join(sorted(allowed_statuses))}.",
+            detail=(
+                f"Status must be one of: "
+                f"{', '.join(sorted(allowed_statuses))}."
+            ),
         )
 
     order = (
@@ -237,7 +326,10 @@ def update_order_status(
     )
 
     if order is None:
-        raise HTTPException(status_code=404, detail="Order not found.")
+        raise HTTPException(
+            status_code=404,
+            detail="Order not found.",
+        )
 
     if order.status in {"CANCELLED", "DELIVERED"} and order.status != new_status:
         raise HTTPException(
@@ -245,7 +337,29 @@ def update_order_status(
             detail=f"A {order.status.lower()} order cannot be changed.",
         )
 
-    order.status = new_status
+    # Record history and notifications only when the status actually changes.
+    if order.status != new_status:
+        order.status = new_status
+
+        if new_status == "CANCELLED":
+            create_admin_notification(
+                db=db,
+                notification_type="CANCELLATION",
+                title="Order Cancelled",
+                message=f"Order {order.id} has been cancelled.",
+                related_type="ORDER",
+                related_id=order.id,
+            )
+
+        db.add(
+            OrderStatusHistory(
+                order_id=order.id,
+                status=new_status,
+                description=get_status_description(new_status),
+                updated_by=admin.id,
+            )
+        )
+
     db.commit()
 
     return (
@@ -254,3 +368,48 @@ def update_order_status(
         .filter(Order.id == order_id)
         .first()
     )
+# =========================
+# CUSTOMER ORDER TRACKING
+# =========================
+
+@router.get(
+    "/{order_id}/tracking",
+    response_model=OrderTrackingResponse,
+)
+def track_order(
+    order_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # Fetch order, items and status history.
+    order = (
+        db.query(Order)
+        .options(
+            joinedload(Order.items),
+            selectinload(Order.status_history),
+        )
+        .filter(Order.id == order_id)
+        .first()
+    )
+
+    # Check whether the order exists.
+    if order is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Order not found.",
+        )
+
+    # Customers can only track their own orders.
+    if (
+        order.user_id != current_user.id
+        and current_user.role != "ADMIN"
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="You are not allowed to track this order.",
+        )
+
+    return {
+        "order": order,
+        "history": order.status_history,
+    }

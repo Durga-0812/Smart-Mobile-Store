@@ -21,6 +21,8 @@ from app.schemas import (
     TokenResponse,
     UserResponse,
 )
+from app.services.admin_notifications import create_admin_notification
+
 from app.security import (
     verify_password,
     hash_password,
@@ -122,6 +124,16 @@ def signup(
     )
 
     db.add(user)
+
+    create_admin_notification(
+        db=db,
+        notification_type="CUSTOMER",
+        title="New Customer Registered",
+        message=f"New customer {user.full_name} ({user.email}) registered.",
+        related_type="CUSTOMER",
+        related_id=user.id,
+    )
+
     db.commit()
     db.refresh(user)
 
@@ -250,6 +262,16 @@ def google_login(
         )
 
         db.add(user)
+
+        create_admin_notification(
+            db=db,
+            notification_type="CUSTOMER",
+            title="New Customer Registered",
+            message=f"New customer {user.full_name} ({user.email}) registered using Google.",
+            related_type="CUSTOMER",
+            related_id=user.id,
+        )
+
         db.commit()
         db.refresh(user)
 

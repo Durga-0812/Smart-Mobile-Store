@@ -113,6 +113,7 @@ class OrderResponse(BaseModel):
     shipping: Decimal
     total: Decimal
     created_at: datetime
+    delivery_address: Optional[str] = None
     items: List[OrderItemResponse]
 
     # Razorpay payment information
@@ -126,6 +127,25 @@ class OrderResponse(BaseModel):
 
 class OrderStatusUpdate(BaseModel):
     status: str
+
+# =========================
+# ORDER TRACKING SCHEMAS
+# =========================
+
+class OrderStatusHistoryResponse(BaseModel):
+    id: str
+    status: str
+    description: Optional[str] = None
+    updated_by: Optional[str] = None
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class OrderTrackingResponse(BaseModel):
+    order: OrderResponse
+    history: List[OrderStatusHistoryResponse]
+
 
 
 # =========================

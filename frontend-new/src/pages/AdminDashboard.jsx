@@ -19,7 +19,7 @@ import {
 import "./AdminDashboard.css";
 import AdminOrders from "../components/admin/AdminOrders";
 import AdminMessages from "../components/admin/AdminMessages";
-
+import AdminFeedback from "../components/admin/AdminFeedback";
 import {
   getCanonicalCategory,
   getCategoryId,
@@ -141,6 +141,12 @@ export default function AdminDashboard({ fullName, onLogout }) {
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [retryingOrderId, setRetryingOrderId] = useState(null);
 
+  const [activityNotifications, setActivityNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityError, setActivityError] = useState("");
+  const [updatingNotificationId, setUpdatingNotificationId] = useState(null);
+
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyProduct);
@@ -255,6 +261,105 @@ export default function AdminDashboard({ fullName, onLogout }) {
       setError(err.message || "Unable to load notifications.");
     } finally {
       setNotificationsLoading(false);
+    }
+  }
+
+  async function loadActivityNotifications() {
+    setActivityLoading(true);
+    setActivityError("");
+
+    try {
+      const response = await fetch(
+        `${API}/admin/notifications/`,
+        {
+          headers: {
+            Authorization: `Bearer ${token()}`,
+          },
+        }
+      );
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(
+          data?.detail || "Unable to load activity notifications."
+        );
+      }
+
+      setActivityNotifications(
+        Array.isArray(data?.items) ? data.items : []
+      );
+
+      setUnreadCount(Number(data?.unread_count || 0));
+    } catch (err) {
+      setActivityError(
+        err.message || "Unable to load activity notifications."
+      );
+    } finally {
+      setActivityLoading(false);
+    }
+  }
+
+  async function markActivityNotificationRead(notificationId) {
+    setUpdatingNotificationId(notificationId);
+    setActivityError("");
+
+    try {
+      const response = await fetch(
+        `${API}/admin/notifications/${encodeURIComponent(notificationId)}/read`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token()}`,
+          },
+        }
+      );
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(
+          data?.detail || "Unable to update notification."
+        );
+      }
+
+      await loadActivityNotifications();
+    } catch (err) {
+      setActivityError(
+        err.message || "Unable to update notification."
+      );
+    } finally {
+      setUpdatingNotificationId(null);
+    }
+  }
+
+  async function markAllActivityNotificationsRead() {
+    setActivityError("");
+
+    try {
+      const response = await fetch(
+        `${API}/admin/notifications/read-all`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token()}`,
+          },
+        }
+      );
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(
+          data?.detail || "Unable to mark notifications as read."
+        );
+      }
+
+      await loadActivityNotifications();
+    } catch (err) {
+      setActivityError(
+        err.message || "Unable to mark notifications as read."
+      );
     }
   }
 
@@ -693,6 +798,7 @@ export default function AdminDashboard({ fullName, onLogout }) {
     ["Products", "⬡"],
     ["Customers", "♟"],
     ["Messages", "✉"],
+    ["Feedback", "⭐"],
     ["Notifications", "🔔"],
     ["Settings", "⚙"],
   ];
@@ -747,6 +853,7 @@ export default function AdminDashboard({ fullName, onLogout }) {
 
                 if (label === "Notifications") {
                   loadFailedNotifications();
+                  loadActivityNotifications();
                 }
               }}
             >
@@ -1579,10 +1686,11 @@ export default function AdminDashboard({ fullName, onLogout }) {
                     </table>
                   </div>
                 )
-              ) : section === "Orders" ? (
-                <AdminOrders />
-              ) : section === "Categories" ? (
-                <div className="admin-category-grid">
+                           ) : section === "Orders" ? (
+                              <AdminOrders />
+              ) : section === "Feedback" ? (
+                <AdminFeedback />
+              ) : section === "Categories" ? (                <div className="admin-category-grid">
                   {categorySummaries.map((category) => (
                     <article
                       className="admin-category-card"
@@ -1652,6 +1760,185 @@ export default function AdminDashboard({ fullName, onLogout }) {
                 </div>
               ) : section === "Notifications" ? (
                 <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                    <h2>Admin Activity Notifications</h2>
+                    <span
+                      style={{
+                        background: "#7000c8",
+                        color: "#fff",
+                        padding: "5px 12px",
+                        borderRadius: "20px",
+                        fontSize: "13px",
+                        fontWeight: "600",
+                      }}
+                    >
+                      {unreadCount} Unread
+                    </span>
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: "12px",
+                      flexWrap: "wrap",
+                      marginTop: "12px",
+                      marginBottom: "16px",
+                    }}
+                  >
+                    <p style={{ margin: 0 }}>
+                      Monitor new orders, payments, customers, messages,
+                      cancellations and low stock.
+                    </p>
+
+                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                      <button
+                        type="button"
+                        className="admin-add-button"
+                        onClick={loadActivityNotifications}
+                        disabled={activityLoading}
+                      >
+                        {activityLoading ? "Loading..." : "Refresh Activity"}
+                      </button>
+
+                      <button
+                        type="button"
+                        className="admin-add-button"
+                        onClick={markAllActivityNotificationsRead}
+                        disabled={unreadCount === 0 || activityLoading}
+                      >
+                        Mark All as Read
+                      </button>
+                    </div>
+                  </div>
+
+                  {activityError && (
+                    <p style={{ color: "#dc2626" }}>{activityError}</p>
+                  )}
+
+                  {activityLoading ? (
+                    <p>Loading activity notifications...</p>
+                  ) : activityNotifications.length === 0 ? (
+                    <p>No activity notifications yet.</p>
+                  ) : (
+                    <div
+                      style={{
+                        display: "grid",
+                        gap: "12px",
+                        marginBottom: "30px",
+                      }}
+                    >
+                      {activityNotifications.map((item) => {
+                        const icons = {
+                          ORDER: "🛒",
+                          PAYMENT: "💳",
+                          CANCELLATION: "❌",
+                          CUSTOMER: "👤",
+                          MESSAGE: "📩",
+                          LOW_STOCK: "📦",
+                        };
+
+                        return (
+                          <div
+                            key={item.id}
+                            style={{
+                              padding: "16px",
+                              borderRadius: "12px",
+                              border: item.is_read
+                                ? "1px solid #ddd"
+                                : "1px solid #7000c8",
+                              background: item.is_read
+                                ? "var(--admin-card-bg, #fff)"
+                                : "rgba(112, 0, 200, 0.07)",
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              gap: "16px",
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            <div style={{ flex: 1, minWidth: "220px" }}>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "9px",
+                                  marginBottom: "7px",
+                                }}
+                              >
+                                <span style={{ fontSize: "22px" }}>
+                                  {icons[item.notification_type] || "🔔"}
+                                </span>
+
+                                <strong>{item.title}</strong>
+
+                                {!item.is_read && (
+                                  <span
+                                    style={{
+                                      background: "#7000c8",
+                                      color: "#fff",
+                                      borderRadius: "10px",
+                                      padding: "3px 8px",
+                                      fontSize: "11px",
+                                    }}
+                                  >
+                                    NEW
+                                  </span>
+                                )}
+                              </div>
+
+                              <p style={{ margin: "4px 0 8px" }}>
+                                {item.message}
+                              </p>
+
+                              <small style={{ opacity: 0.7 }}>
+                                {item.created_at
+                                  ? new Date(item.created_at).toLocaleString()
+                                  : "Date unavailable"}
+                              </small>
+
+                              {item.related_id && (
+                                <small
+                                  style={{
+                                    display: "block",
+                                    marginTop: "5px",
+                                    opacity: 0.7,
+                                  }}
+                                >
+                                  {item.related_type}: {item.related_id}
+                                </small>
+                              )}
+                            </div>
+
+                            {!item.is_read && (
+                              <button
+                                type="button"
+                                className="admin-add-button"
+                                disabled={updatingNotificationId === item.id}
+                                onClick={() =>
+                                  markActivityNotificationRead(item.id)
+                                }
+                              >
+                                {updatingNotificationId === item.id
+                                  ? "Updating..."
+                                  : "Mark as Read"}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <hr
+                    style={{
+                      margin: "25px 0",
+                      border: 0,
+                      borderTop: "1px solid var(--admin-border, #ddd)",
+                    }}
+                  />
+
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
                     <h2>Failed Order Notifications</h2>
                     <button

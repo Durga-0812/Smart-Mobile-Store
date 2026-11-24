@@ -15,6 +15,8 @@ from app.services.order_webhook import (
     send_stock_update,
 )
 
+from app.services.admin_notifications import create_admin_notification
+
 
 logger = logging.getLogger(__name__)
 
@@ -399,7 +401,21 @@ def verify_payment(
                 .first()
             )
 
+            previous_stock = product.stock_quantity
             product.stock_quantity -= item.quantity
+
+            if previous_stock > 5 and product.stock_quantity <= 5:
+                create_admin_notification(
+                    db=db,
+                    notification_type="LOW_STOCK",
+                    title="Low Product Stock",
+                    message=(
+                        f"{product.name} has only "
+                        f"{product.stock_quantity} units remaining."
+                    ),
+                    related_type="PRODUCT",
+                    related_id=product.id,
+                )
 
         # Clear the user's cart after successful payment.
         db.query(CartItem).filter(
@@ -410,6 +426,17 @@ def verify_payment(
         order.payment_method = "RAZORPAY"
         order.razorpay_payment_id = request.razorpay_payment_id
         order.status = "CONFIRMED"
+
+        create_admin_notification(
+            db=db,
+            notification_type="PAYMENT",
+            title="Payment Successful",
+            message=(
+                f"Payment of ₹{order.total} received for order {order.id}."
+            ),
+            related_type="ORDER",
+            related_id=order.id,
+        )
 
         db.commit()
         db.refresh(order)

@@ -5,6 +5,7 @@ from app.database import get_db
 from app.models import CartItem, Product, OrderItem
 from app.schemas import ProductCreate, ProductUpdate, ProductResponse
 from app.security import require_admin
+from app.services.admin_notifications import create_admin_notification
 
 router = APIRouter(
     prefix="/api/v1/products",
@@ -30,6 +31,21 @@ def create_product(
     product = Product(**product_data)
 
     db.add(product)
+    db.flush()
+
+    if product.stock_quantity <= 5:
+        create_admin_notification(
+            db=db,
+            notification_type="LOW_STOCK",
+            title="Low Product Stock",
+            message=(
+                f"{product.name} was added with only "
+                f"{product.stock_quantity} units in stock."
+            ),
+            related_type="PRODUCT",
+            related_id=product.id,
+        )
+
     db.commit()
     db.refresh(product)
 
@@ -81,8 +97,27 @@ def update_product(
 
     changes = data.model_dump(exclude_unset=True)
 
+    previous_stock = product.stock_quantity
+
     for field, value in changes.items():
         setattr(product, field, value)
+
+    if (
+        "stock_quantity" in changes
+        and previous_stock > 5
+        and product.stock_quantity <= 5
+    ):
+        create_admin_notification(
+            db=db,
+            notification_type="LOW_STOCK",
+            title="Low Product Stock",
+            message=(
+                f"{product.name} now has only "
+                f"{product.stock_quantity} units remaining."
+            ),
+            related_type="PRODUCT",
+            related_id=product.id,
+        )
 
     db.commit()
     db.refresh(product)

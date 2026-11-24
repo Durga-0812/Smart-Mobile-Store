@@ -99,6 +99,12 @@ class Order(Base):
         back_populates="order",
         cascade="all, delete-orphan",
     )
+    status_history = relationship(
+        "OrderStatusHistory",
+        back_populates="order",
+        cascade="all, delete-orphan",
+        order_by="OrderStatusHistory.updated_at",
+    )
 
 
 class OrderItem(Base):
@@ -136,3 +142,65 @@ class StoreMessage(Base):
     message = Column(Text, nullable=False)
     is_read = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+class OrderStatusHistory(Base):
+    __tablename__ = "order_status_history"
+
+    id = Column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+    )
+
+    order_id = Column(
+        String(36),
+        ForeignKey("orders.id"),
+        nullable=False,
+        index=True,
+    )
+
+    status = Column(String(30), nullable=False)
+
+    description = Column(Text, nullable=True)
+
+    updated_by = Column(
+        String(36),
+        ForeignKey("users.id"),
+        nullable=True,
+    )
+
+    updated_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False,
+    )
+
+    order = relationship(
+        "Order",
+        back_populates="status_history",
+    )
+class AdminNotification(Base):
+    __tablename__ = "admin_notifications"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    notification_type = Column(String(40), nullable=False, index=True)
+    title = Column(String(200), nullable=False)
+    message = Column(Text, nullable=False)
+    related_type = Column(String(40), nullable=True)
+    related_id = Column(String(36), nullable=True)
+    is_read = Column(Boolean, default=False, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+class Feedback(Base):
+    __tablename__ = "feedback"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
+    product_id = Column(String(36), ForeignKey("products.id"), nullable=True, index=True)
+    rating = Column(Integer, nullable=False)
+    comment = Column(Text, nullable=False)
+    admin_reply = Column(Text, nullable=True)
+    is_read = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    replied_at = Column(DateTime, nullable=True)
+
+    user = relationship("User")
+    product = relationship("Product")
