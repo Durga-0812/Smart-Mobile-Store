@@ -260,3 +260,141 @@
     flex-direction: column;
   }
 }
+/* Customer Satisfaction ML Dashboard */
+.satisfaction-dashboard {
+  margin-bottom: 25px;
+  padding: 22px;
+  border-radius: 14px;
+  background: var(--admin-card, #fff);
+  border: 1px solid var(--admin-border, #eee);
+}
+
+.satisfaction-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.satisfaction-heading h2 {
+  margin: 0 0 7px;
+  font-size: 21px;
+}
+
+.satisfaction-heading p {
+  margin: 0;
+  color: #888;
+  font-size: 14px;
+}
+
+.satisfaction-ai-badge {
+  padding: 7px 13px;
+  border-radius: 20px;
+  background: #f0e5ff;
+  color: #7000c8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.satisfaction-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px;
+}
+
+.satisfaction-card {
+  padding: 18px;
+  border-radius: 11px;
+  background: var(--admin-bg, #f8f6fb);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.satisfaction-card span {
+  color: #888;
+  font-size: 13px;
+}
+
+.satisfaction-card strong {
+  font-size: 26px;
+  color: #7000c8;
+}
+
+.satisfaction-card.satisfied strong {
+  color: #13834b;
+}
+
+.satisfaction-card.not-satisfied strong {
+  color: #d04444;
+}
+
+.satisfaction-card.percentage strong {
+  color: #1769aa;
+}
+
+.satisfaction-card.confidence strong {
+  color: #a66b00;
+}
+
+.satisfaction-note {
+  margin: 18px 0 0;
+  color: #888;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.feedback-prediction {
+  margin-top: 15px;
+  padding: 13px;
+  border-radius: 9px;
+  background: var(--admin-bg, #f8f6fb);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.feedback-prediction > strong {
+  font-size: 13px;
+}
+
+.prediction-badge {
+  padding: 6px 11px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.prediction-positive {
+  background: #e2f8eb;
+  color: #13834b;
+}
+
+.prediction-negative {
+  background: #feeceb;
+  color: #b42318;
+}
+
+.prediction-unknown {
+  background: #eee;
+  color: #666;
+}
+
+.feedback-prediction small {
+  color: #888;
+  font-size: 12px;
+}
+
+@media (max-width: 650px) {
+  .satisfaction-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .satisfaction-summary {
+    grid-template-columns: 1fr;
+  }
+}
+

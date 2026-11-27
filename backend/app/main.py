@@ -20,7 +20,6 @@ from app import models
 from app.routers import auth, products, orders, cart, messages, chatbot, analytics, payments, notifications, feedback
 
 Base.metadata.create_all(bind=engine)
-
 # Safely add delivery and payment columns to existing orders table
 existing_columns = {
     column["name"]
@@ -37,7 +36,20 @@ order_columns = {
     "razorpay_payment_id": "VARCHAR(100)",
 }
 
+# Customer Satisfaction ML columns
+existing_feedback_columns = {
+    column["name"]
+    for column in inspect(engine).get_columns("feedback")
+}
+
+feedback_columns = {
+    "satisfaction_prediction": "VARCHAR(30)",
+    "satisfaction_confidence": "FLOAT",
+}
+
 with engine.begin() as connection:
+
+    # Update existing orders table
     for column_name, column_type in order_columns.items():
         if column_name not in existing_columns:
             connection.execute(
@@ -47,7 +59,17 @@ with engine.begin() as connection:
                 )
             )
 
-    # Ensure Razorpay references are unique in existing databases.
+    # Update existing feedback table
+    for column_name, column_type in feedback_columns.items():
+        if column_name not in existing_feedback_columns:
+            connection.execute(
+                text(
+                    f"ALTER TABLE feedback ADD COLUMN "
+                    f"{column_name} {column_type}"
+                )
+            )
+
+    # Ensure Razorpay references are unique.
     connection.execute(
         text(
             "CREATE UNIQUE INDEX IF NOT EXISTS "

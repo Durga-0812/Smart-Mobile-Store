@@ -11,6 +11,9 @@ export default function AdminFeedback() {
   const [replyLoading, setReplyLoading] = useState(null);
   const [notice, setNotice] = useState("");
 
+  const [satisfactionStats, setSatisfactionStats] = useState(null);
+  const [statsError, setStatsError] = useState("");
+
   const token = localStorage.getItem("access_token");
 
   async function loadFeedback() {
@@ -40,8 +43,42 @@ export default function AdminFeedback() {
     }
   }
 
+  async function loadSatisfactionStats() {
+    setStatsError("");
+
+    try {
+      const response = await fetch(
+        `${API}/admin/satisfaction-stats`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.detail || "Unable to load satisfaction statistics."
+        );
+      }
+
+      setSatisfactionStats(data);
+    } catch (err) {
+      setStatsError(err.message || "Unable to load ML statistics.");
+    }
+  }
+
+  async function refreshDashboard() {
+    await Promise.all([
+      loadFeedback(),
+      loadSatisfactionStats(),
+    ]);
+  }
+
   useEffect(() => {
-    loadFeedback();
+    refreshDashboard();
   }, []);
 
   async function sendReply(feedback) {
@@ -130,12 +167,13 @@ export default function AdminFeedback() {
         <button
           type="button"
           className="feedback-refresh"
-          onClick={loadFeedback}
+          onClick={refreshDashboard}
         >
           ↻ Refresh
         </button>
       </div>
 
+      {/* Existing Feedback Summary */}
       <div className="feedback-summary">
         <div className="feedback-summary-card">
           <span>Total Feedback</span>
@@ -152,6 +190,78 @@ export default function AdminFeedback() {
           <strong>{pendingCount}</strong>
         </div>
       </div>
+
+      {/* Customer Satisfaction ML Dashboard */}
+      <section className="satisfaction-dashboard">
+        <div className="satisfaction-heading">
+          <div>
+            <h2>Customer Satisfaction Prediction</h2>
+            <p>
+              AI-based sentiment analysis of customer feedback.
+            </p>
+          </div>
+          <span className="satisfaction-ai-badge">
+            ML Powered
+          </span>
+        </div>
+
+        {statsError && (
+          <div className="feedback-alert feedback-error">
+            {statsError}
+          </div>
+        )}
+
+        {satisfactionStats ? (
+          <div className="satisfaction-summary">
+            <div className="satisfaction-card">
+              <span>Total Analyzed</span>
+              <strong>
+                {satisfactionStats.analyzed_feedback}
+              </strong>
+            </div>
+
+            <div className="satisfaction-card satisfied">
+              <span>Satisfied Customers</span>
+              <strong>
+                {satisfactionStats.satisfied_customers}
+              </strong>
+            </div>
+
+            <div className="satisfaction-card not-satisfied">
+              <span>Not Satisfied</span>
+              <strong>
+                {satisfactionStats.not_satisfied_customers}
+              </strong>
+            </div>
+
+            <div className="satisfaction-card percentage">
+              <span>Satisfaction Percentage</span>
+              <strong>
+                {satisfactionStats.satisfaction_percentage}%
+              </strong>
+            </div>
+
+            <div className="satisfaction-card confidence">
+              <span>Average Prediction Confidence</span>
+              <strong>
+                {satisfactionStats.average_prediction_confidence}%
+              </strong>
+            </div>
+          </div>
+        ) : (
+          !statsError && (
+            <p className="feedback-loading">
+              Loading satisfaction statistics...
+            </p>
+          )
+        )}
+
+        <p className="satisfaction-note">
+          Note: Predictions estimate review sentiment using the
+          trained machine learning model. They are not verified
+          customer satisfaction measurements.
+        </p>
+      </section>
 
       {error && (
         <div className="feedback-alert feedback-error">
@@ -214,6 +324,31 @@ export default function AdminFeedback() {
               <div className="feedback-comment">
                 <strong>Customer Review</strong>
                 <p>{feedback.comment}</p>
+              </div>
+
+              {/* Individual ML Prediction */}
+              <div className="feedback-prediction">
+                <strong>ML Satisfaction Prediction</strong>
+
+                <span
+                  className={
+                    feedback.satisfaction_prediction === "SATISFIED"
+                      ? "prediction-badge prediction-positive"
+                      : feedback.satisfaction_prediction === "NOT SATISFIED"
+                      ? "prediction-badge prediction-negative"
+                      : "prediction-badge prediction-unknown"
+                  }
+                >
+                  {feedback.satisfaction_prediction || "Not Analyzed"}
+                </span>
+
+                {feedback.satisfaction_confidence !== null &&
+                  feedback.satisfaction_confidence !== undefined && (
+                    <small>
+                      Prediction confidence:{" "}
+                      {feedback.satisfaction_confidence}%
+                    </small>
+                  )}
               </div>
 
               <div className="feedback-date">

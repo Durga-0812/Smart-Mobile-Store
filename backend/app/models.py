@@ -9,6 +9,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
+    Float,
     Numeric,
     String,
     Text,
@@ -190,7 +191,11 @@ class AdminNotification(Base):
     is_read = Column(Boolean, default=False, nullable=False, index=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
 class Feedback(Base):
+    comment = Column(Text, nullable=False)
     __tablename__ = "feedback"
+        # Customer Satisfaction ML Predictions
+    satisfaction_prediction = Column(String(30), nullable=True)
+    satisfaction_confidence = Column(Float, nullable=True)
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
